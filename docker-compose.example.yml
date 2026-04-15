@@ -1,0 +1,27 @@
+services:
+  esphome:
+    image: ghcr.io/esphome/esphome
+    container_name: esphome
+    restart: unless-stopped
+    ports:
+      - "6052:6052"
+    volumes:
+      # Your ESPHome config directory
+      - ./config:/config
+
+      # Sync host timezone into the container
+      - /etc/localtime:/etc/localtime:ro
+
+      # Persist PlatformIO toolchains between container recreations
+      - esphome-platformio:/root/.platformio
+
+      # Enhanced dashboard overrides
+      # Adjust the host paths if you extracted the overrides elsewhere
+      - ./overrides/models.py:/esphome/esphome/dashboard/models.py
+      - ./overrides/const.py:/esphome/esphome/dashboard/const.py
+      - ./overrides/web_server.py:/esphome/esphome/dashboard/web_server.py
+      - ./overrides/core.py:/esphome/esphome/dashboard/core.py
+      - ./overrides/templates:/esphome/esphome/dashboard/templates
+
+volumes:
+  esphome-platformio:
