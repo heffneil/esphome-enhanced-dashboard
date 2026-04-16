@@ -1065,58 +1065,72 @@ class PingHostHandler(BaseHandler):
             self.write(json.dumps({"error": "invalid JSON"}))
             return
 
-        host = (data.get("host") or "").strip()
-        count = int(data.get("count", 4))
-        # Basic input validation - letters, digits, dots, dashes, colons only
-        if not host or not re.match(r"^[a-zA-Z0-9.\-_:]+$", host):
-            self.set_status(400)
-            self.write(json.dumps({"error": "invalid host"}))
-            return
-        count = max(1, min(count, 10))
-
-        # Resolve DNS via the dashboard's cache when possible
-        addresses: list[str] = []
-        try:
-            now = time.monotonic()
-            addresses = await DASHBOARD.dns_cache.async_resolve(host, now)
-        except Exception:  # pylint: disable=broad-except
-            addresses = []
-
-        resolved = addresses[0] if addresses else host
+        self.set_header("content-type", "application/json")
 
         try:
-            result = await async_ping(resolved, count=count, timeout=2, privileged=False)
-        except SocketPermissionError:
+            host = (data.get("host") or "").strip()
+            count_raw = data.get("count", 4)
             try:
+                count = int(count_raw)
+            except (TypeError, ValueError):
+                count = 4
+            count = max(1, min(count, 10))
+
+            # Basic input validation - letters, digits, dots, dashes, colons only
+            if not host or not re.match(r"^[a-zA-Z0-9.\-_:]+$", host):
+                self.set_status(400)
+                self.write(json.dumps({"error": "invalid host"}))
+                return
+
+            # Attempt to resolve through the dashboard's DNS cache. This is
+            # best-effort; many addresses (mDNS .local or raw IPs) don't need
+            # it. Any failure falls through to the ping call with the raw host.
+            resolved = host
+            try:
+                now = time.monotonic()
+                maybe_addresses = await DASHBOARD.dns_cache.async_resolve(host, now)
+                if (
+                    maybe_addresses
+                    and not isinstance(maybe_addresses, BaseException)
+                    and isinstance(maybe_addresses, list)
+                    and maybe_addresses
+                ):
+                    resolved = maybe_addresses[0]
+            except Exception:  # pylint: disable=broad-except
+                pass
+
+            # icmplib can ping by hostname too, but we pass the resolved IP
+            # when we have one. Try unprivileged first (works in rootless
+            # containers); fall back to privileged on permission errors.
+            try:
+                result = await async_ping(
+                    resolved, count=count, timeout=2, privileged=False
+                )
+            except SocketPermissionError:
                 result = await async_ping(
                     resolved, count=count, timeout=2, privileged=True
                 )
-            except Exception as exc:  # pylint: disable=broad-except
-                self.set_header("content-type", "application/json")
-                self.write(json.dumps({"error": f"ping failed: {exc}"}))
-                return
-        except Exception as exc:  # pylint: disable=broad-except
-            self.set_header("content-type", "application/json")
-            self.write(json.dumps({"error": f"ping failed: {exc}"}))
-            return
 
-        self.set_header("content-type", "application/json")
-        self.write(
-            json.dumps(
-                {
-                    "host": host,
-                    "resolved": resolved,
-                    "is_alive": result.is_alive,
-                    "packets_sent": result.packets_sent,
-                    "packets_received": result.packets_received,
-                    "packet_loss": result.packet_loss,
-                    "min_rtt": result.min_rtt,
-                    "avg_rtt": result.avg_rtt,
-                    "max_rtt": result.max_rtt,
-                    "jitter": result.jitter,
-                }
+            self.write(
+                json.dumps(
+                    {
+                        "host": host,
+                        "resolved": resolved,
+                        "is_alive": bool(result.is_alive),
+                        "packets_sent": int(result.packets_sent),
+                        "packets_received": int(result.packets_received),
+                        "packet_loss": float(result.packet_loss),
+                        "min_rtt": float(result.min_rtt) if result.min_rtt else None,
+                        "avg_rtt": float(result.avg_rtt) if result.avg_rtt else None,
+                        "max_rtt": float(result.max_rtt) if result.max_rtt else None,
+                        "jitter": float(result.jitter) if result.jitter else None,
+                    }
+                )
             )
-        )
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.exception("Ping host failed")
+            self.set_status(200)
+            self.write(json.dumps({"error": f"ping failed: {exc}"}))
 
 
 class DownloadListRequestHandler(BaseHandler):
