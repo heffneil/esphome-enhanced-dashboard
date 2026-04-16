@@ -42,6 +42,7 @@ class ConfiguredDeviceDict(TypedDict, total=False):
     web_port: int | None
     target_platform: str | None
     tags: list[str]
+    inactive: bool
 
 
 class ArchivedDeviceDict(TypedDict, total=False):
@@ -138,10 +139,15 @@ def build_device_list_response(
         tags = dashboard.device_tags
     except Exception:  # pylint: disable=broad-except
         tags = {}
+    try:
+        inactive = dashboard.inactive_devices
+    except Exception:  # pylint: disable=broad-except
+        inactive = set()
     configured = []
     for entry in entries:
         d = dict(entry.to_dict())
         d["tags"] = tags.get(entry.filename, [])
+        d["inactive"] = entry.filename in inactive
         configured.append(d)
     try:
         archived = build_archived_device_list(tags)

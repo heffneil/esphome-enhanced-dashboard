@@ -85,6 +85,7 @@ class ESPHomeDashboard:
         "_background_tasks",
         "ignored_devices",
         "device_tags",
+        "inactive_devices",
         "_ping_status_task",
     )
 
@@ -103,6 +104,7 @@ class ESPHomeDashboard:
         self._background_tasks: set[asyncio.Task] = set()
         self.ignored_devices: set[str] = set()
         self.device_tags: dict[str, list[str]] = {}
+        self.inactive_devices: set[str] = set()
         self._ping_status_task: asyncio.Task | None = None
 
     async def async_setup(self) -> None:
@@ -112,6 +114,7 @@ class ESPHomeDashboard:
         self.entries = DashboardEntries(self)
         await self.loop.run_in_executor(None, self.load_ignored_devices)
         await self.loop.run_in_executor(None, self.load_device_tags)
+        await self.loop.run_in_executor(None, self.load_inactive_devices)
 
     def load_ignored_devices(self) -> None:
         storage_path = ignored_devices_storage_path()
@@ -152,6 +155,30 @@ class ESPHomeDashboard:
                 json.dump({"tags": self.device_tags}, indent=2, fp=f_handle)
         except Exception:  # pylint: disable=broad-except
             _LOGGER.exception("Failed to save device tags")
+
+    def _inactive_devices_path(self) -> Path:
+        """Return the path to the inactive devices storage file."""
+        from esphome.core import CORE
+
+        return CORE.data_dir / "inactive-devices.json"
+
+    def load_inactive_devices(self) -> None:
+        try:
+            storage_path = self._inactive_devices_path()
+            with storage_path.open("r", encoding="utf-8") as f_handle:
+                data = json.load(f_handle)
+                self.inactive_devices = set(data.get("inactive_devices", []))
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    def save_inactive_devices(self) -> None:
+        try:
+            storage_path = self._inactive_devices_path()
+            storage_path.parent.mkdir(parents=True, exist_ok=True)
+            with storage_path.open("w", encoding="utf-8") as f_handle:
+                json.dump({"inactive_devices": sorted(self.inactive_devices)}, indent=2, fp=f_handle)
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("Failed to save inactive devices")
 
     def _async_start_ping_status(self, ping_status: PingStatus) -> None:
         self._ping_status_task = asyncio.create_task(ping_status.async_run())

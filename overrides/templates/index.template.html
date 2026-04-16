@@ -83,6 +83,9 @@
     .dot.online { background: #4caf50; box-shadow: 0 0 6px #4caf5088; }
     .dot.offline { background: #555; }
     .dot.unknown { background: #ff9800; box-shadow: 0 0 6px #ff980066; }
+    .dot.inactive { background: #333; border: 1px solid #555; }
+    tr.inactive-row { opacity: 0.4; }
+    tr.inactive-row:hover { opacity: 0.6; }
 
     /* Cells */
     .cell-name { color: #fff; font-weight: 500; }
@@ -431,9 +434,9 @@
       $panelOverlay=document.getElementById("panelOverlay"),$sidePanel=document.getElementById("sidePanel");
 
   function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=s;return d.innerHTML}
-  function stOf(f){var s=ping[f];return s===true?"online":s===false?"offline":"unknown"}
-  function stLbl(f){var s=ping[f];return s===true?"Online":s===false?"Offline":"Unknown"}
-  function stOrd(f){var s=ping[f];return s===true?0:(s===null||s===undefined)?1:2}
+  function stOf(d){if(d.inactive)return"inactive";var s=ping[d.configuration];return s===true?"online":s===false?"offline":"unknown"}
+  function stLbl(d){if(d.inactive)return"Inactive";var s=ping[d.configuration];return s===true?"Online":s===false?"Offline":"Unknown"}
+  function stOrd(d){if(d.inactive)return 3;var s=ping[d.configuration];return s===true?0:(s===null||s===undefined)?1:2}
 
   function getAllTags(){
     var m={};
@@ -472,7 +475,7 @@
     else if(sCol==="config"){va=(a.configuration||"").toLowerCase();vb=(b.configuration||"").toLowerCase()}
     else if(sCol==="tags"){va=(a.tags||[]).join(",");vb=(b.tags||[]).join(",")}
     else if(sCol==="status"){
-      va=stOrd(a.configuration);vb=stOrd(b.configuration);
+      va=stOrd(a);vb=stOrd(b);
       if(va!==vb)return sDir==="asc"?va-vb:vb-va;
       va=(a.friendly_name||a.name||"").toLowerCase();vb=(b.friendly_name||b.name||"").toLowerCase();
     }
@@ -482,9 +485,9 @@
   }
 
   function row(d,isArch){
-    var st=isArch?"offline":stOf(d.configuration);
-    var sl=isArch?"Archived":stLbl(d.configuration);
-    var cls=isArch?' class="archived-row"':'';
+    var st=isArch?"offline":stOf(d);
+    var sl=isArch?"Archived":stLbl(d);
+    var cls=isArch?' class="archived-row"':d.inactive?' class="inactive-row"':'';
     var hasUpd=!isArch&&d.deployed_version&&d.current_version&&d.deployed_version!==d.current_version;
     var tags=d.tags||[];
     var c=esc(d.configuration);
@@ -585,6 +588,14 @@
   window.D={
     archive:function(c){if(!confirm("Archive "+c+"?"))return;D.closePanel();postForm(REL+"archive?configuration="+encodeURIComponent(c)).then(refresh)},
     unarchive:function(c){postForm(REL+"unarchive?configuration="+encodeURIComponent(c)).then(refresh)},
+    toggleInactive:function(c,inactive){
+      post(REL+"toggle-inactive",{configuration:c,inactive:inactive}).then(function(){
+        var d=devices.find(function(x){return x.configuration===c});
+        if(d)d.inactive=inactive;
+        render();
+        if(panelConfig===c)D.openPanel(c);
+      });
+    },
     toggleArchived:function(){archOpen=!archOpen;render()},
     toggleTag:function(tag){var i=activeTags.indexOf(tag);if(i>=0)activeTags.splice(i,1);else activeTags.push(tag);render()},
     clearTags:function(){activeTags=[];render()},
@@ -594,7 +605,7 @@
       panelConfig=cfg;
       var d=devices.find(function(x){return x.configuration===cfg})||archived.find(function(x){return x.configuration===cfg});
       if(!d)return;
-      var st=stOf(d.configuration),sl=stLbl(d.configuration);
+      var st=stOf(d),sl=stLbl(d);
       var cu=encodeURIComponent(d.configuration);
       var hasUpd=d.deployed_version&&d.current_version&&d.deployed_version!==d.current_version;
       var tags=d.tags||[];
@@ -635,11 +646,17 @@
       a+='<button class="sp-btn" onclick="D.runCmd(\'compile\',\''+c+'\')">Compile</button>';
       a+='<button class="sp-btn" onclick="D.runCmd(\'logs\',\''+c+'\')">Logs</button>';
       if(d.web_port&&d.address)a+='<a class="sp-btn" href="http://'+esc(d.address)+':'+d.web_port+'" target="_blank" rel="noopener">Visit Device</a>';
+      a+='<button class="sp-btn" onclick="D.pingHost(\''+c+'\')">Ping Device</button>';
       a+='<div class="sp-sep"></div>';
       a+='<button class="sp-btn" onclick="D.showApiKey(\''+cu+'\')">Show API Key</button>';
       a+='<button class="sp-btn" onclick="D.runCmd(\'clean\',\''+c+'\')">Clean Build</button>';
       a+='<button class="sp-btn" onclick="D.runCmd(\'clean-mqtt\',\''+c+'\')">Clean MQTT</button>';
       a+='<div class="sp-sep"></div>';
+      if(d.inactive){
+        a+='<button class="sp-btn" onclick="D.toggleInactive(\''+c+'\',false)">Mark Active</button>';
+      }else{
+        a+='<button class="sp-btn" onclick="D.toggleInactive(\''+c+'\',true)">Mark Inactive</button>';
+      }
       a+='<button class="sp-btn sp-btn-danger" onclick="D.archive(\''+c+'\')">Archive</button>';
       document.getElementById("spActions").innerHTML=a;
 
@@ -917,6 +934,59 @@
           else{$status.textContent="Error: "+r.status}
         })
         .catch(function(){$status.textContent="Save failed"});
+    },
+
+    pingHost:function(cfg){
+      var dev=devices.find(function(x){return x.configuration===cfg});
+      var defaultAddr=(dev&&dev.address)?dev.address:"";
+      var name=(dev&&(dev.friendly_name||dev.name))||cfg;
+
+      D.dlgPrompt("Ping Device","Enter IP address or hostname to ping \""+name+"\":",defaultAddr).then(function(addr){
+        if(!addr)return;
+        addr=addr.trim();
+        if(!addr)return;
+        if(!/^[a-zA-Z0-9.\-_:]+$/.test(addr)){
+          D.dlgAlert("Invalid Address",'<div>"'+esc(addr)+'" is not a valid IP or hostname.</div>');
+          return;
+        }
+        D._openModal("Ping "+addr);
+        var $body=document.getElementById("cmdModalBody");
+        $body.innerHTML='<div id="cmdOut">Pinging '+esc(addr)+' ...</div>';
+        document.getElementById("cmdModalFooter").innerHTML=
+          '<button onclick="D.pingHost(\''+esc(cfg)+'\')">PING AGAIN</button>'+
+          '<button onclick="D.closeCmdModal()">CLOSE</button>';
+
+        var headers={"Content-Type":"application/json"};
+        var x=getXsrf();if(x)headers["X-Xsrftoken"]=x;
+        fetch(REL+"ping-host",{method:"POST",credentials:"same-origin",headers:headers,body:JSON.stringify({host:addr,count:4})})
+          .then(function(r){return r.json()})
+          .then(function(data){
+            var $out=document.getElementById("cmdOut");
+            if(!$out)return;
+            if(data.error){
+              $out.innerHTML='<span class="err">'+esc(data.error)+'</span>';
+              return;
+            }
+            var fmt=function(n){return n===null||n===undefined?"-":(Math.round(n*100)/100)+" ms"};
+            var status=data.is_alive?'<span class="ok">ALIVE</span>':'<span class="err">NO RESPONSE</span>';
+            var html="";
+            html+="Host:            "+esc(data.host)+"\n";
+            if(data.resolved&&data.resolved!==data.host)html+="Resolved to:     "+esc(data.resolved)+"\n";
+            html+="Status:          "+status+"\n";
+            html+="Packets sent:    "+data.packets_sent+"\n";
+            html+="Packets received:"+data.packets_received+"\n";
+            html+="Packet loss:     "+Math.round(data.packet_loss*100)+"%\n";
+            html+="Min RTT:         "+fmt(data.min_rtt)+"\n";
+            html+="Avg RTT:         "+fmt(data.avg_rtt)+"\n";
+            html+="Max RTT:         "+fmt(data.max_rtt)+"\n";
+            html+="Jitter:          "+fmt(data.jitter)+"\n";
+            $out.innerHTML=html;
+          })
+          .catch(function(err){
+            var $out=document.getElementById("cmdOut");
+            if($out)$out.innerHTML='<span class="err">Request failed: '+esc(String(err))+'</span>';
+          });
+      });
     },
 
     showApiKey:function(cfgEncoded){

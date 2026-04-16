@@ -1018,6 +1018,107 @@ class DeviceTagsHandler(BaseHandler):
         self.write(json.dumps({"tags": DASHBOARD.device_tags}))
 
 
+class ToggleInactiveHandler(BaseHandler):
+    def check_xsrf_cookie(self) -> None:
+        """Skip XSRF for JSON API calls with proper auth."""
+
+    @authenticated
+    async def post(self) -> None:
+        try:
+            data = json.loads(self.request.body)
+        except (json.JSONDecodeError, TypeError):
+            self.set_status(400)
+            self.write(json.dumps({"error": "invalid JSON"}))
+            return
+        configuration = data.get("configuration")
+        inactive = data.get("inactive", True)
+        if not configuration:
+            self.set_status(400)
+            self.write(json.dumps({"error": "configuration required"}))
+            return
+        if inactive:
+            DASHBOARD.inactive_devices.add(configuration)
+        else:
+            DASHBOARD.inactive_devices.discard(configuration)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, DASHBOARD.save_inactive_devices)
+        self.set_header("content-type", "application/json")
+        self.write(json.dumps({"inactive_devices": sorted(DASHBOARD.inactive_devices)}))
+
+
+class PingHostHandler(BaseHandler):
+    """Ping an arbitrary host and return latency stats."""
+
+    def check_xsrf_cookie(self) -> None:
+        """Skip XSRF for JSON API calls with proper auth."""
+
+    @authenticated
+    async def post(self) -> None:
+        import re
+
+        from icmplib import SocketPermissionError, async_ping
+
+        try:
+            data = json.loads(self.request.body)
+        except (json.JSONDecodeError, TypeError):
+            self.set_status(400)
+            self.write(json.dumps({"error": "invalid JSON"}))
+            return
+
+        host = (data.get("host") or "").strip()
+        count = int(data.get("count", 4))
+        # Basic input validation - letters, digits, dots, dashes, colons only
+        if not host or not re.match(r"^[a-zA-Z0-9.\-_:]+$", host):
+            self.set_status(400)
+            self.write(json.dumps({"error": "invalid host"}))
+            return
+        count = max(1, min(count, 10))
+
+        # Resolve DNS via the dashboard's cache when possible
+        addresses: list[str] = []
+        try:
+            now = time.monotonic()
+            addresses = await DASHBOARD.dns_cache.async_resolve(host, now)
+        except Exception:  # pylint: disable=broad-except
+            addresses = []
+
+        resolved = addresses[0] if addresses else host
+
+        try:
+            result = await async_ping(resolved, count=count, timeout=2, privileged=False)
+        except SocketPermissionError:
+            try:
+                result = await async_ping(
+                    resolved, count=count, timeout=2, privileged=True
+                )
+            except Exception as exc:  # pylint: disable=broad-except
+                self.set_header("content-type", "application/json")
+                self.write(json.dumps({"error": f"ping failed: {exc}"}))
+                return
+        except Exception as exc:  # pylint: disable=broad-except
+            self.set_header("content-type", "application/json")
+            self.write(json.dumps({"error": f"ping failed: {exc}"}))
+            return
+
+        self.set_header("content-type", "application/json")
+        self.write(
+            json.dumps(
+                {
+                    "host": host,
+                    "resolved": resolved,
+                    "is_alive": result.is_alive,
+                    "packets_sent": result.packets_sent,
+                    "packets_received": result.packets_received,
+                    "packet_loss": result.packet_loss,
+                    "min_rtt": result.min_rtt,
+                    "avg_rtt": result.avg_rtt,
+                    "max_rtt": result.max_rtt,
+                    "jitter": result.jitter,
+                }
+            )
+        )
+
+
 class DownloadListRequestHandler(BaseHandler):
     @authenticated
     @bind_config
@@ -1679,6 +1780,8 @@ def make_app(debug=get_bool_env(ENV_DEV)) -> tornado.web.Application:
             (f"{rel}version", EsphomeVersionHandler),
             (f"{rel}ignore-device", IgnoreDeviceRequestHandler),
             (f"{rel}device-tags", DeviceTagsHandler),
+            (f"{rel}toggle-inactive", ToggleInactiveHandler),
+            (f"{rel}ping-host", PingHostHandler),
         ],
         **app_settings,
     )
