@@ -238,6 +238,7 @@
       font-size: 13px; color: #ccc; line-height: 1.6;
       padding: 12px 16px; white-space: pre-wrap; word-break: break-all;
       display: flex; flex-direction: column;
+      user-select: text; -webkit-user-select: text;
     }
     .cmd-modal-body.editor-mode {
       padding: 0; white-space: normal; word-break: normal;
@@ -1093,14 +1094,25 @@
       if(btn){var m=btn.getAttribute("onclick").match(/saveYaml\('([^']+)'\)/);if(m)D.saveYaml(m[1])}
     }
   });
-  // Click backdrop of command modal to close
-  document.getElementById("cmdOverlay").addEventListener("click",function(e){
-    if(e.target===this)D.closeCmdModal();
-  });
-  // Dialog backdrop click = cancel
-  document.getElementById("dlgOverlay").addEventListener("click",function(e){
-    if(e.target===this)D._closeDlg(null);
-  });
+  // Click backdrop of command modal to close (only if mousedown STARTED on backdrop;
+  // prevents closing when user selects text and drags outside)
+  (function(){
+    var o=document.getElementById("cmdOverlay"),downOnBackdrop=false;
+    o.addEventListener("mousedown",function(e){downOnBackdrop=(e.target===o)});
+    o.addEventListener("mouseup",function(e){
+      if(downOnBackdrop&&e.target===o)D.closeCmdModal();
+      downOnBackdrop=false;
+    });
+  })();
+  // Same pattern for the prompt/confirm dialog
+  (function(){
+    var o=document.getElementById("dlgOverlay"),downOnBackdrop=false;
+    o.addEventListener("mousedown",function(e){downOnBackdrop=(e.target===o)});
+    o.addEventListener("mouseup",function(e){
+      if(downOnBackdrop&&e.target===o)D._closeDlg(null);
+      downOnBackdrop=false;
+    });
+  })();
 
   function refresh(){fetch(REL+"devices",{credentials:"same-origin"}).then(function(r){return r.json()}).then(function(d){devices=d.configured||[];archived=d.archived||[];render()})}
 
