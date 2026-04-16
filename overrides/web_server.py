@@ -1086,32 +1086,45 @@ class PingHostHandler(BaseHandler):
             # mDNS (.local) lookups directly, so use the dashboard's mDNS
             # system for those and the DNS cache for everything else.
             resolved = host
+            resolve_failed = False
             try:
                 if host.endswith(".local") and DASHBOARD.mdns_status:
-                    # Prefer cached mDNS addresses when available
                     cached = DASHBOARD.mdns_status.get_cached_addresses(host)
                     if cached:
                         resolved = cached[0]
                     else:
-                        # Active mDNS resolution
-                        mdns_addresses = (
-                            await DASHBOARD.mdns_status.async_resolve_host(host)
+                        mdns_addresses = await DASHBOARD.mdns_status.async_resolve_host(
+                            host
                         )
                         if mdns_addresses:
                             resolved = mdns_addresses[0]
+                        else:
+                            resolve_failed = True
                 else:
                     now = time.monotonic()
                     maybe_addresses = await DASHBOARD.dns_cache.async_resolve(
                         host, now
                     )
-                    if (
-                        isinstance(maybe_addresses, list)
-                        and maybe_addresses
-                    ):
+                    if isinstance(maybe_addresses, list) and maybe_addresses:
                         resolved = maybe_addresses[0]
             except Exception:  # pylint: disable=broad-except
-                # Resolution failed; icmplib will get another shot at it
-                pass
+                resolve_failed = True
+
+            if resolve_failed and resolved == host:
+                # We couldn't resolve and don't want icmplib to spend 10s
+                # failing a DNS lookup we know will fail. Return early.
+                self.write(
+                    json.dumps(
+                        {
+                            "error": (
+                                f"Unable to resolve '{host}'. "
+                                "If this is a .local address, the container "
+                                "may not have mDNS access to that host."
+                            )
+                        }
+                    )
+                )
+                return
 
             # icmplib can ping by hostname too, but we pass the resolved IP
             # when we have one. Try unprivileged first (works in rootless
