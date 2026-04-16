@@ -1082,21 +1082,35 @@ class PingHostHandler(BaseHandler):
                 self.write(json.dumps({"error": "invalid host"}))
                 return
 
-            # Attempt to resolve through the dashboard's DNS cache. This is
-            # best-effort; many addresses (mDNS .local or raw IPs) don't need
-            # it. Any failure falls through to the ping call with the raw host.
+            # Resolve the host. Container environments typically can't do
+            # mDNS (.local) lookups directly, so use the dashboard's mDNS
+            # system for those and the DNS cache for everything else.
             resolved = host
             try:
-                now = time.monotonic()
-                maybe_addresses = await DASHBOARD.dns_cache.async_resolve(host, now)
-                if (
-                    maybe_addresses
-                    and not isinstance(maybe_addresses, BaseException)
-                    and isinstance(maybe_addresses, list)
-                    and maybe_addresses
-                ):
-                    resolved = maybe_addresses[0]
+                if host.endswith(".local") and DASHBOARD.mdns_status:
+                    # Prefer cached mDNS addresses when available
+                    cached = DASHBOARD.mdns_status.get_cached_addresses(host)
+                    if cached:
+                        resolved = cached[0]
+                    else:
+                        # Active mDNS resolution
+                        mdns_addresses = (
+                            await DASHBOARD.mdns_status.async_resolve_host(host)
+                        )
+                        if mdns_addresses:
+                            resolved = mdns_addresses[0]
+                else:
+                    now = time.monotonic()
+                    maybe_addresses = await DASHBOARD.dns_cache.async_resolve(
+                        host, now
+                    )
+                    if (
+                        isinstance(maybe_addresses, list)
+                        and maybe_addresses
+                    ):
+                        resolved = maybe_addresses[0]
             except Exception:  # pylint: disable=broad-except
+                # Resolution failed; icmplib will get another shot at it
                 pass
 
             # icmplib can ping by hostname too, but we pass the resolved IP
