@@ -1,8 +1,10 @@
 # ESPHome Enhanced Dashboard
 
-A drop-in replacement for the stock ESPHome dashboard, designed as an overlay on top of the official Docker image. Gives you a compact, dark-themed table view with search, sortable columns, device tagging, archiving, a sliding side panel for every device action, and an in-page modal for logs, compile, validate, and YAML editing.
+A drop-in replacement for the stock ESPHome dashboard. Compact dark-themed table view with search, sortable columns, device tagging, archiving, a sliding side panel for every device action, and in-page modals for logs, compile, validate, and YAML editing.
 
 The original ESPHome dashboard is preserved and available at `/classic`.
+
+**Current base:** ESPHome 2026.4
 
 > Pull request tracking upstream adoption: [esphome/esphome#15704](https://github.com/esphome/esphome/pull/15704)
 
@@ -11,68 +13,26 @@ The original ESPHome dashboard is preserved and available at `/classic`.
 - **Compact sortable table** — Status, Name, IP Address, Platform, ESPHome Version, Comment, Tags, Config File
 - **Live search** across name, friendly name, comment, IP, and config filename
 - **Device tags** with a quick-filter pill bar (OR logic across multiple tags)
+- **Mark Inactive** — dims a device, sorts it to the bottom, and stops polling it
 - **Archive** section with one-click restore
-- **Sliding side panel** with every per-device action: Update, Install (Upload OTA), Install (Compile + Upload), Install to Specific Address, Edit, Validate, Compile, Logs, Visit, Show API Key, Clean Build, Clean MQTT, Archive
-- **In-page modal** for command output — streaming ANSI-colored logs with DOWNLOAD LOGS button, no popup windows
+- **Sliding side panel** with every per-device action: Update, Install (Upload OTA), Install (Compile + Upload), Install to Specific Address, Edit, Validate, Compile, Logs, Visit, Show API Key, Clean Build, Clean MQTT, Mark Inactive, Archive
+- **In-page modal** for command output — streaming ANSI-colored logs with DOWNLOAD LOGS button
 - **Embedded Ace editor** for YAML editing with syntax highlighting, Ctrl+S save, unsaved-changes warning
 - **Install to Specific Address** — upload firmware to an arbitrary IP/hostname with a confirmation dialog
 - **Inter webfont** for a clean modern look
 
-## Screenshots
-
-> Add screenshots here once the repo is published.
-
 ## Install
 
-You have two installation options. **Both use the official ESPHome Docker image** — we just overlay the modified dashboard files on top. This means the compile toolchains and everything else the official image provides keep working unchanged.
+### Option 1: Docker image (recommended)
 
-Download the release zip and extract it somewhere persistent on your host, for example:
+The easiest way. Just swap your image name — no volume mounts, no file copying, everything is baked in.
 
-```bash
-mkdir -p /docker/esphome-dashboard-overrides
-cd /docker/esphome-dashboard-overrides
-curl -LO https://github.com/heffneil/esphome-enhanced-dashboard/releases/latest/download/overrides.zip
-unzip overrides.zip
-```
-
-After extraction you should have:
-
-```
-/docker/esphome-dashboard-overrides/
-├── const.py
-├── core.py
-├── models.py
-├── web_server.py
-└── templates/
-    └── index.template.html
-```
-
-### Option 1: `docker run`
-
-```bash
-docker run -d \
-  --name esphome \
-  -p 6052:6052 \
-  --restart unless-stopped \
-  -v /path/to/your/config:/config \
-  -v /docker/esphome-dashboard-overrides/models.py:/esphome/esphome/dashboard/models.py \
-  -v /docker/esphome-dashboard-overrides/const.py:/esphome/esphome/dashboard/const.py \
-  -v /docker/esphome-dashboard-overrides/web_server.py:/esphome/esphome/dashboard/web_server.py \
-  -v /docker/esphome-dashboard-overrides/core.py:/esphome/esphome/dashboard/core.py \
-  -v /docker/esphome-dashboard-overrides/templates:/esphome/esphome/dashboard/templates \
-  ghcr.io/esphome/esphome
-```
-
-Replace `/path/to/your/config` with the directory containing your ESPHome YAML files. If you already run ESPHome in Docker, use the same config path you already have.
-
-### Option 2: `docker compose`
-
-Create or edit your `docker-compose.yml`:
+**Docker Compose:**
 
 ```yaml
 services:
   esphome:
-    image: ghcr.io/esphome/esphome
+    image: heffneil/esphome-enhanced-dashboard:latest
     container_name: esphome
     restart: unless-stopped
     ports:
@@ -80,109 +40,174 @@ services:
     volumes:
       - /path/to/your/config:/config
       - /etc/localtime:/etc/localtime:ro
-
-      # Enhanced dashboard overrides
-      - /docker/esphome-dashboard-overrides/models.py:/esphome/esphome/dashboard/models.py
-      - /docker/esphome-dashboard-overrides/const.py:/esphome/esphome/dashboard/const.py
-      - /docker/esphome-dashboard-overrides/web_server.py:/esphome/esphome/dashboard/web_server.py
-      - /docker/esphome-dashboard-overrides/core.py:/esphome/esphome/dashboard/core.py
-      - /docker/esphome-dashboard-overrides/templates:/esphome/esphome/dashboard/templates
 ```
 
-Then start it:
+Then:
 
 ```bash
 docker compose up -d
 ```
 
-Open the dashboard at `http://<your-host>:6052/` and you should see the new UI. The original dashboard is still accessible at `http://<your-host>:6052/classic` if you ever need it.
+**Docker run:**
+
+```bash
+docker run -d \
+  --name esphome \
+  -p 6052:6052 \
+  -v /path/to/your/config:/config \
+  --restart unless-stopped \
+  heffneil/esphome-enhanced-dashboard:latest
+```
+
+Replace `/path/to/your/config` with the directory containing your ESPHome YAML files. That's it.
+
+### Option 2: Volume mount overrides
+
+If you prefer to keep the official ESPHome image and overlay just the dashboard files:
+
+```bash
+git clone https://github.com/heffneil/esphome-enhanced-dashboard.git /opt/esphome-dashboard
+```
+
+**Docker Compose:**
+
+```yaml
+services:
+  esphome:
+    image: esphome/esphome
+    container_name: esphome
+    restart: unless-stopped
+    ports:
+      - "6052:6052"
+    volumes:
+      - /path/to/your/config:/config
+      - /etc/localtime:/etc/localtime:ro
+      # Enhanced dashboard overrides
+      - /opt/esphome-dashboard/overrides/models.py:/esphome/esphome/dashboard/models.py
+      - /opt/esphome-dashboard/overrides/const.py:/esphome/esphome/dashboard/const.py
+      - /opt/esphome-dashboard/overrides/web_server.py:/esphome/esphome/dashboard/web_server.py
+      - /opt/esphome-dashboard/overrides/core.py:/esphome/esphome/dashboard/core.py
+      - /opt/esphome-dashboard/overrides/status/ping.py:/esphome/esphome/dashboard/status/ping.py
+      - /opt/esphome-dashboard/overrides/templates:/esphome/esphome/dashboard/templates
+```
+
+**Docker run:**
+
+```bash
+docker run -d \
+  --name esphome \
+  -p 6052:6052 \
+  --restart unless-stopped \
+  -v /path/to/your/config:/config \
+  -v /opt/esphome-dashboard/overrides/models.py:/esphome/esphome/dashboard/models.py \
+  -v /opt/esphome-dashboard/overrides/const.py:/esphome/esphome/dashboard/const.py \
+  -v /opt/esphome-dashboard/overrides/web_server.py:/esphome/esphome/dashboard/web_server.py \
+  -v /opt/esphome-dashboard/overrides/core.py:/esphome/esphome/dashboard/core.py \
+  -v /opt/esphome-dashboard/overrides/status/ping.py:/esphome/esphome/dashboard/status/ping.py \
+  -v /opt/esphome-dashboard/overrides/templates:/esphome/esphome/dashboard/templates \
+  esphome/esphome
+```
+
+### Option 3: Build from source
+
+```bash
+git clone https://github.com/heffneil/esphome-enhanced-dashboard.git
+cd esphome-enhanced-dashboard
+docker build -t esphome-enhanced-dashboard .
+```
+
+Then use `esphome-enhanced-dashboard` as your image name. You can pin the ESPHome version:
+
+```bash
+docker build --build-arg BASE_VERSION=2026.2.0 -t esphome-enhanced-dashboard .
+```
 
 ## Upgrading
 
-When a new release is published, download the new `overrides.zip`, extract it over the existing directory, and restart the container:
+**Docker image (Option 1):**
 
 ```bash
-cd /docker/esphome-dashboard-overrides
-curl -LO https://github.com/heffneil/esphome-enhanced-dashboard/releases/latest/download/overrides.zip
-unzip -o overrides.zip
-
-# docker run
-docker restart esphome
-
-# docker compose
-docker compose restart esphome
+docker pull heffneil/esphome-enhanced-dashboard:latest
+docker compose down && docker compose up -d
+# or: docker stop esphome && docker rm esphome && docker run ...
 ```
 
-Because we mount the files in, no image rebuild is needed — a container restart is enough.
+**Volume mounts (Option 2):**
+
+```bash
+cd /opt/esphome-dashboard
+git pull
+docker restart esphome
+```
+
+**Build from source (Option 3):**
+
+```bash
+cd esphome-enhanced-dashboard
+git pull
+docker build -t esphome-enhanced-dashboard .
+docker compose down && docker compose up -d
+```
 
 ## Reverting
 
-Remove the override volume mounts from your `docker run` command or `docker-compose.yml`, then restart. The official image's stock dashboard comes back untouched.
+**Docker image:** Change your image back to `esphome/esphome` and restart.
 
-## How the overlay works
+**Volume mounts:** Remove the override volume lines from your compose/run command and restart.
 
-The ESPHome Python package is installed inside the container at `/esphome/esphome/`. We volume-mount our replacement files on top of the originals:
+## How it works
 
-| Override file | Mounts over |
+The ESPHome Python package is installed inside the container at `/esphome/esphome/`. Our image (or volume mounts) replaces these dashboard files:
+
+| File | What it does |
 |---|---|
-| `models.py` | `/esphome/esphome/dashboard/models.py` |
-| `const.py` | `/esphome/esphome/dashboard/const.py` |
-| `web_server.py` | `/esphome/esphome/dashboard/web_server.py` |
-| `core.py` | `/esphome/esphome/dashboard/core.py` |
-| `templates/` | `/esphome/esphome/dashboard/templates/` (new directory, holds the new UI) |
+| `web_server.py` | Routes `/` to the new template, adds `/classic` for the original, adds `/device-tags` and `/toggle-inactive` endpoints |
+| `core.py` | Adds device tag and inactive device storage (JSON files in your config dir) |
+| `models.py` | Adds `tags`, `inactive`, and `archived` fields to the device API response |
+| `const.py` | Adds `entry_archived` / `entry_unarchived` WebSocket events |
+| `status/ping.py` | Skips polling inactive devices |
+| `templates/index.template.html` | The entire new dashboard UI (self-contained, no build step) |
 
-On startup, the replaced `web_server.py` points `MainRequestHandler` at `templates/index.template.html` and registers a new `ClassicDashboardHandler` at `/classic` that serves the stock template from the `esphome-dashboard` pip package.
-
-Because the official image is untouched, everything else — PlatformIO, compile toolchains, OTA, mDNS, API auth, Home Assistant ingress — behaves exactly as it does upstream.
+Everything else — PlatformIO, compile toolchains, OTA, mDNS, API auth, Home Assistant ingress — is unchanged from upstream ESPHome.
 
 ## Storage
 
-Tags are stored at `/config/.esphome/.../device-tags.json` inside your config volume. They survive container recreation.
+- **Tags** stored at `<config>/.esphome/device-tags.json`
+- **Inactive devices** stored at `<config>/.esphome/inactive-devices.json`
+- **Archived configs** move to `<config>/archive/` (unchanged from stock ESPHome)
 
-Archived configs move from `/config/` to `/config/archive/` when you archive a device (this behavior is unchanged from stock ESPHome — we only surface the archive folder in the UI).
+All data lives in your config volume and survives container recreation.
 
 ## Troubleshooting
 
 **Dashboard still looks like the stock one**
-
-- Hard refresh the browser (`Cmd+Shift+R` or `Ctrl+Shift+R`)
-- Confirm the container actually restarted after the overrides were added
-- Inside the container, check the template is present:
+- Hard refresh: `Ctrl+Shift+R` (or `Cmd+Shift+R` on Mac)
+- Verify the template exists inside the container:
   ```bash
-  docker exec esphome ls -la /esphome/esphome/dashboard/templates/
+  docker exec esphome ls /esphome/esphome/dashboard/templates/
   ```
-  You should see `index.template.html`.
 
 **Compile fails with `xtensa-lx106-elf-g++: not found`**
 
-This is unrelated to the overlay — it means your PlatformIO toolchains aren't installed. First compile after a fresh install downloads them automatically; add the PlatformIO cache as a named volume so they persist:
+Unrelated to the dashboard — PlatformIO toolchains download on first compile. Add a named volume to persist them:
 
 ```bash
 -v esphome-platformio:/root/.platformio
 ```
 
-If the toolchain download fails or lands in the wrong place, copy it into ESPHome's expected path:
+**WebSocket keeps reconnecting**
 
-```bash
-docker exec -it esphome cp -r \
-  /root/.platformio/packages/toolchain-xtensa \
-  /config/.esphome/platformio/packages/toolchain-xtensa
+Usually a reverse proxy issue. For nginx, ensure:
+```nginx
+proxy_http_version 1.1;
+proxy_set_header Upgrade $http_upgrade;
+proxy_set_header Connection "upgrade";
 ```
-
-**WebSocket keeps reconnecting / `/events` flaps**
-
-Usually a reverse proxy that doesn't forward WebSocket upgrade headers. If you use nginx, make sure you have `proxy_http_version 1.1`, `proxy_set_header Upgrade $http_upgrade`, and `proxy_set_header Connection "upgrade"` on the location block.
-
-## Known limitations
-
-- The **Edit** action opens the stock dashboard's Ace-based editor in a new tab when needed (full YAML edit); inline editing is also available via the embedded Ace editor in a modal. Deep-linking directly into the classic editor is not possible because that UI is an SPA without URL routing.
-- The PlatformIO toolchain download still happens on first compile, exactly as on the stock image.
-- This is a dashboard overlay only — it doesn't change any device firmware behavior, config schema, or YAML handling.
 
 ## License
 
-Same license as upstream ESPHome (see https://github.com/esphome/esphome/blob/dev/LICENSE). The override files here are derivatives of the ESPHome dashboard source, modified for UI enhancements.
+Same license as upstream ESPHome. See [LICENSE](https://github.com/esphome/esphome/blob/dev/LICENSE).
 
 ## Upstream
 
-Work here tracks [PR esphome/esphome#15704](https://github.com/esphome/esphome/pull/15704). If/when that lands, this repo will mirror whatever release number upstream stamps on it and the overlay becomes unnecessary — you can just `docker pull ghcr.io/esphome/esphome:<version>` and delete the override mounts.
+Tracks [PR esphome/esphome#15704](https://github.com/esphome/esphome/pull/15704). If accepted upstream, this repo becomes unnecessary — just use the official image.
