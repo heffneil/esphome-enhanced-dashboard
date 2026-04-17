@@ -379,6 +379,10 @@
     <div class="sp-actions-label">Actions</div>
     <div id="spActions"></div>
   </div>
+  <div class="sp-actions">
+    <div class="sp-actions-label">Utilities</div>
+    <div id="spUtilities"></div>
+  </div>
 </div>
 
 <!-- Tag Edit Modal -->
@@ -635,7 +639,7 @@
       th+='</div>';
       document.getElementById("spTags").innerHTML=th;
 
-      // Actions
+      // Actions — firmware + device management
       var c=esc(cfg),cu=encodeURIComponent(cfg);
       var a="";
       if(hasUpd)a+='<button class="sp-btn" onclick="D.runCmd(\'run\',\''+c+'\')">Update to '+esc(d.current_version)+'</button>';
@@ -647,11 +651,7 @@
       a+='<button class="sp-btn" onclick="D.runCmd(\'compile\',\''+c+'\')">Compile</button>';
       a+='<button class="sp-btn" onclick="D.runCmd(\'logs\',\''+c+'\')">Logs</button>';
       if(d.web_port&&d.address)a+='<a class="sp-btn" href="http://'+esc(d.address)+':'+d.web_port+'" target="_blank" rel="noopener">Visit Device</a>';
-      a+='<button class="sp-btn" onclick="D.pingHost(\''+c+'\')">Ping Device</button>';
-      a+='<div class="sp-sep"></div>';
       a+='<button class="sp-btn" onclick="D.showApiKey(\''+cu+'\')">Show API Key</button>';
-      a+='<button class="sp-btn" onclick="D.runCmd(\'clean\',\''+c+'\')">Clean Build</button>';
-      a+='<button class="sp-btn" onclick="D.runCmd(\'clean-mqtt\',\''+c+'\')">Clean MQTT</button>';
       a+='<div class="sp-sep"></div>';
       if(d.inactive){
         a+='<button class="sp-btn" onclick="D.toggleInactive(\''+c+'\',false)">Mark Active</button>';
@@ -660,6 +660,13 @@
       }
       a+='<button class="sp-btn sp-btn-danger" onclick="D.archive(\''+c+'\')">Archive</button>';
       document.getElementById("spActions").innerHTML=a;
+
+      // Utilities — network/diagnostics
+      var u="";
+      u+='<button class="sp-btn" onclick="D.pingHost(\''+c+'\')">Ping Device</button>';
+      u+='<button class="sp-btn" onclick="D.runCmd(\'clean\',\''+c+'\')">Clean Build</button>';
+      u+='<button class="sp-btn" onclick="D.runCmd(\'clean-mqtt\',\''+c+'\')">Clean MQTT</button>';
+      document.getElementById("spUtilities").innerHTML=u;
 
       $panelOverlay.classList.add("open");
       $sidePanel.classList.add("open");
