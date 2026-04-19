@@ -79,6 +79,25 @@
     .tag-btn.active { background: #18BCF2; border-color: #18BCF2; color: #000; font-weight: 600; }
     .tag-btn .tag-count { margin-left: 4px; opacity: 0.6; font-size: 10px; }
 
+    /* Batch bar */
+    .batch-bar {
+      background: #1a2a3a; border-bottom: 1px solid #2a3a4a; padding: 8px 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .batch-count { color: #6ea8fe; font-size: 12px; font-weight: 600; margin-right: 8px; font-family: "Inter", sans-serif; }
+    .batch-btn {
+      background: transparent; border: 1px solid #333; color: #ccc;
+      font-size: 12px; padding: 5px 12px; border-radius: 4px;
+      cursor: pointer; font-family: inherit;
+    }
+    .batch-btn:hover { background: #222; color: #fff; }
+    .batch-btn-primary { background: #18BCF2; border-color: #18BCF2; color: #000; font-weight: 600; }
+    .batch-btn-primary:hover { background: #13a5d6; color: #000; }
+
+    /* Checkbox column */
+    .col-check { width: 34px; }
+    .row-check { cursor: pointer; }
+
     /* Table */
     .table-wrap { padding: 0; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; }
@@ -111,7 +130,8 @@
 
     /* Cells */
     .cell-name { color: #fff; font-weight: 500; }
-    .ip { font-family: "SF Mono","Fira Code",Menlo,Consolas,monospace; font-size: 12px; color: #6ea8fe; }
+    .ip { font-family: "SF Mono","Fira Code",Menlo,Consolas,monospace; font-size: 12px; color: #6ea8fe; text-decoration: none; }
+    a.ip:hover { text-decoration: underline; color: #8ec4ff; }
     .plat { background: #1a1a2e; color: #6ea8fe; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase; display: inline-block; }
     .ver { font-size: 12px; color: #888; }
     .ver-update { color: #ff9800; font-weight: 500; }
@@ -365,9 +385,16 @@
 <div class="tagbar" id="tagbar"></div>
 
 <div class="table-wrap">
+  <div class="batch-bar" id="batchBar" style="display:none;">
+    <span class="batch-count" id="batchCount">0 selected</span>
+    <button class="batch-btn batch-btn-primary" onclick="D.batchUpdate()">Update Selected</button>
+    <button class="batch-btn" onclick="D.batchCompile()">Compile Selected</button>
+    <button class="batch-btn" onclick="D.batchClearSelection()">Clear</button>
+  </div>
   <table>
     <thead id="thead">
       <tr>
+        <th class="col-check no-sort"><input type="checkbox" id="selectAll" onclick="D.toggleSelectAll(this)"></th>
         <th data-sort="status">Status</th>
         <th data-sort="name">Name</th>
         <th data-sort="ip">IP Address</th>
@@ -450,7 +477,7 @@
   "use strict";
   var REL="{% raw relative_url %}";
 
-  var devices=[],archived=[],ping={};
+  var devices=[],archived=[],ping={},selected={};
   var search="",activeTags=[],archOpen=false,sCol="name",sDir="asc",editingConfig=null,panelConfig=null;
 
   var $search=document.getElementById("searchInput"),$clear=document.getElementById("searchClear"),
@@ -521,9 +548,27 @@
     var c=esc(d.configuration);
 
     var h='<tr'+cls+' onclick="D.openPanel(\''+c+'\')">';
+    // Checkbox (only for active, non-archived devices)
+    if(isArch){
+      h+='<td class="col-check" onclick="event.stopPropagation()">&nbsp;</td>';
+    }else{
+      var checked=selected[d.configuration]?' checked':'';
+      h+='<td class="col-check" onclick="event.stopPropagation()"><input type="checkbox" class="row-check" data-config="'+c+'"'+checked+' onclick="D.toggleRowSelect(this)"></td>';
+    }
     h+='<td><span class="dot '+st+'"></span></td>';
     h+='<td><span class="cell-name">'+esc(d.friendly_name||d.name)+"</span></td>";
-    h+="<td>"+(d.address?'<span class="ip">'+esc(d.address)+"</span>":'<span class="muted">-</span>')+"</td>";
+    // IP column — link to web UI if the device has a web_server enabled
+    h+="<td>";
+    if(d.address){
+      if(d.web_port&&!isArch){
+        h+='<a class="ip" href="http://'+esc(d.address)+':'+d.web_port+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open device web UI">'+esc(d.address)+'</a>';
+      }else{
+        h+='<span class="ip">'+esc(d.address)+'</span>';
+      }
+    }else{
+      h+='<span class="muted">-</span>';
+    }
+    h+="</td>";
     h+="<td>"+(d.target_platform?'<span class="plat">'+esc(d.target_platform)+"</span>":'<span class="muted">-</span>')+"</td>";
     h+="<td>";
     if(d.deployed_version){
@@ -573,10 +618,16 @@
     for(var j=0;j<f.length;j++)h+=row(f[j],false);
     if(archived.length){
       var cc=archOpen?"chevron open":"chevron";
-      h+='<tr class="archived-divider" onclick="D.toggleArchived()"><td colspan="8"><span class="'+cc+'">&#9654;</span>Archived<span class="arch-badge">'+archived.length+"</span></td></tr>";
+      h+='<tr class="archived-divider" onclick="D.toggleArchived()"><td colspan="9"><span class="'+cc+'">&#9654;</span>Archived<span class="arch-badge">'+archived.length+"</span></td></tr>";
       if(archOpen)for(var k=0;k<fa.length;k++)h+=row(fa[k],true);
     }
     $tb.innerHTML=h;
+
+    // Prune selections for devices that no longer exist
+    Object.keys(selected).forEach(function(cfg){
+      if(!devices.find(function(d){return d.configuration===cfg}))delete selected[cfg];
+    });
+    if(typeof D!=="undefined"&&D._updateBatchBar)D._updateBatchBar();
 
     var ths=document.querySelectorAll("th[data-sort]");
     for(var t=0;t<ths.length;t++){
@@ -885,6 +936,129 @@
 
     // New Device Wizard
     _boardsCache:{},
+    // Batch selection
+    _updateBatchBar:function(){
+      var keys=Object.keys(selected);
+      var $bar=document.getElementById("batchBar");
+      if(keys.length===0){
+        $bar.style.display="none";
+      }else{
+        $bar.style.display="flex";
+        document.getElementById("batchCount").textContent=keys.length+" selected";
+      }
+      // Update select-all header checkbox
+      var $all=document.getElementById("selectAll");
+      if($all){
+        var activeCount=devices.filter(function(d){return matchDevice(d)}).length;
+        $all.checked=(keys.length>0&&keys.length===activeCount);
+        $all.indeterminate=(keys.length>0&&keys.length<activeCount);
+      }
+    },
+    toggleRowSelect:function(cb){
+      var cfg=cb.getAttribute("data-config");
+      if(cb.checked)selected[cfg]=true;else delete selected[cfg];
+      D._updateBatchBar();
+    },
+    toggleSelectAll:function(cb){
+      if(cb.checked){
+        devices.filter(function(d){return matchDevice(d)}).forEach(function(d){selected[d.configuration]=true});
+      }else{
+        selected={};
+      }
+      // Re-render checkboxes
+      var boxes=document.querySelectorAll(".row-check");
+      for(var i=0;i<boxes.length;i++){
+        boxes[i].checked=!!selected[boxes[i].getAttribute("data-config")];
+      }
+      D._updateBatchBar();
+    },
+    batchClearSelection:function(){
+      selected={};
+      var boxes=document.querySelectorAll(".row-check");
+      for(var i=0;i<boxes.length;i++){boxes[i].checked=false}
+      D._updateBatchBar();
+    },
+    batchUpdate:function(){
+      var cfgs=Object.keys(selected);
+      if(!cfgs.length)return;
+      D._runBatchQueue("run",cfgs,"Update");
+    },
+    batchCompile:function(){
+      var cfgs=Object.keys(selected);
+      if(!cfgs.length)return;
+      D._runBatchQueue("compile",cfgs,"Compile");
+    },
+    _runBatchQueue:function(cmd,cfgs,verb){
+      D.dlgConfirm(verb+" "+cfgs.length+" device"+(cfgs.length===1?"":"s")+"?",
+        '<div>The following devices will be '+verb.toLowerCase()+'d one after another:</div>'+
+        '<div style="margin-top:8px;color:#888;font-size:12px;max-height:200px;overflow-y:auto">'+
+        cfgs.map(esc).join("<br>")+'</div>',
+        {okLabel:verb+" All"}
+      ).then(function(ok){
+        if(!ok)return;
+        D._batchRunSequential(cmd,cfgs.slice(),verb,0,cfgs.length,[]);
+      });
+    },
+    _batchRunSequential:function(cmd,remaining,verb,index,total,results){
+      if(remaining.length===0){
+        // Done - show summary
+        var html='<div>Batch '+verb.toLowerCase()+' complete:</div><div style="margin-top:10px;font-size:12px">';
+        results.forEach(function(r){
+          var color=r.ok?"#4caf50":"#ff6666";
+          html+='<div style="color:'+color+';margin:3px 0">'+esc(r.cfg)+' — '+(r.ok?"Success":"Failed (exit "+r.code+")")+'</div>';
+        });
+        html+='</div>';
+        D.dlgAlert(verb+" Complete",html);
+        D.batchClearSelection();
+        return;
+      }
+      var cfg=remaining.shift();
+      // Open modal showing progress
+      D.closeCmdModal();
+      D._openModal(verb+" "+(index+1)+"/"+total+": "+cfg);
+      var $body=document.getElementById("cmdModalBody");
+      $body.innerHTML='<div id="cmdOut">['+ (index+1) +'/' + total +'] Starting '+verb.toLowerCase()+' for '+esc(cfg)+'...\n</div>';
+      var $out=document.getElementById("cmdOut");
+      document.getElementById("cmdModalFooter").innerHTML=
+        '<span class="status">Running ['+(index+1)+'/'+total+']...</span>'+
+        '<button onclick="D.closeCmdModal();D.batchClearSelection()">CANCEL BATCH</button>';
+
+      var endpoint=cmd;
+      var needsPort=(cmd==="run"||cmd==="upload"||cmd==="logs");
+      var proto=location.protocol==="https:"?"wss:":"ws:";
+      var ws=new WebSocket(proto+"//"+location.host+REL+endpoint);
+      D._cmdWs=ws;
+      D._rawLog="";
+      ws.onopen=function(){
+        var msg={type:"spawn",configuration:cfg};
+        if(needsPort)msg.port="OTA";
+        ws.send(JSON.stringify(msg));
+      };
+      ws.onmessage=function(ev){
+        var m;try{m=JSON.parse(ev.data)}catch(e){return}
+        if(m.event==="line"){
+          var raw=(m.data||"");
+          if(raw.indexOf("\n")<0)raw+="\n";
+          D._rawLog+=raw;
+          $out.insertAdjacentHTML("beforeend",D._ansi(raw));
+          $body.scrollTop=$body.scrollHeight;
+        }else if(m.event==="exit"){
+          results.push({cfg:cfg,ok:m.code===0,code:m.code});
+          var el=document.createElement("div");
+          el.className=m.code===0?"ok":"err";
+          el.textContent=m.code===0?"\n["+(index+1)+"/"+total+"] Success\n":"\n["+(index+1)+"/"+total+"] Exited with code "+m.code+"\n";
+          $out.appendChild(el);
+          $body.scrollTop=$body.scrollHeight;
+          // Queue next device
+          setTimeout(function(){D._batchRunSequential(cmd,remaining,verb,index+1,total,results)},500);
+        }
+      };
+      ws.onerror=function(){
+        results.push({cfg:cfg,ok:false,code:-1});
+        setTimeout(function(){D._batchRunSequential(cmd,remaining,verb,index+1,total,results)},500);
+      };
+    },
+
     openWizard:function(){
       var platforms=[
         ["esp32","ESP32"],
