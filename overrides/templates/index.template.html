@@ -608,9 +608,14 @@
     // Side Panel
     openPanel:function(cfg){
       panelConfig=cfg;
-      var d=devices.find(function(x){return x.configuration===cfg})||archived.find(function(x){return x.configuration===cfg});
+      var d=devices.find(function(x){return x.configuration===cfg});
+      var isArchived=false;
+      if(!d){
+        d=archived.find(function(x){return x.configuration===cfg});
+        if(d)isArchived=true;
+      }
       if(!d)return;
-      var st=stOf(d),sl=stLbl(d);
+      var st=isArchived?"offline":stOf(d),sl=isArchived?"Archived":stLbl(d);
       var cu=encodeURIComponent(d.configuration);
       var hasUpd=d.deployed_version&&d.current_version&&d.deployed_version!==d.current_version;
       var tags=d.tags||[];
@@ -639,34 +644,45 @@
       th+='</div>';
       document.getElementById("spTags").innerHTML=th;
 
-      // Actions — firmware + device management
+      // Actions
       var c=esc(cfg),cu=encodeURIComponent(cfg);
-      var a="";
-      if(hasUpd)a+='<button class="sp-btn" onclick="D.runCmd(\'run\',\''+c+'\')">Update to '+esc(d.current_version)+'</button>';
-      a+='<button class="sp-btn" onclick="D.runCmd(\'upload\',\''+c+'\')">Install (Upload OTA)</button>';
-      a+='<button class="sp-btn" onclick="D.runCmd(\'run\',\''+c+'\')">Install (Compile + Upload)</button>';
-      a+='<button class="sp-btn" onclick="D.installToAddress(\''+c+'\')">Install to Specific Address...</button>';
-      a+='<button class="sp-btn" onclick="D.openYaml(\''+cu+'\')">Edit</button>';
-      a+='<button class="sp-btn" onclick="D.runCmd(\'validate\',\''+c+'\')">Validate</button>';
-      a+='<button class="sp-btn" onclick="D.runCmd(\'compile\',\''+c+'\')">Compile</button>';
-      a+='<button class="sp-btn" onclick="D.runCmd(\'logs\',\''+c+'\')">Logs</button>';
-      if(d.web_port&&d.address)a+='<a class="sp-btn" href="http://'+esc(d.address)+':'+d.web_port+'" target="_blank" rel="noopener">Visit Device</a>';
-      a+='<button class="sp-btn" onclick="D.showApiKey(\''+cu+'\')">Show API Key</button>';
-      a+='<div class="sp-sep"></div>';
-      if(d.inactive){
-        a+='<button class="sp-btn" onclick="D.toggleInactive(\''+c+'\',false)">Mark Active</button>';
+      var a="",u="";
+      if(isArchived){
+        // Archived devices get a restricted action set
+        a+='<button class="sp-btn" style="color:#66cc66" onclick="D.unarchive(\''+c+'\')">Restore from Archive</button>';
+        a+='<button class="sp-btn" onclick="D.openYaml(\''+cu+'\')">View YAML</button>';
+        // No utilities section for archived devices
+        document.getElementById("spActions").innerHTML=a;
+        document.getElementById("spUtilities").innerHTML="";
+        document.querySelector("#spUtilities").parentElement.style.display="none";
       }else{
-        a+='<button class="sp-btn" onclick="D.toggleInactive(\''+c+'\',true)">Mark Inactive</button>';
-      }
-      a+='<button class="sp-btn sp-btn-danger" onclick="D.archive(\''+c+'\')">Archive</button>';
-      document.getElementById("spActions").innerHTML=a;
+        // Active devices — full action set
+        if(hasUpd)a+='<button class="sp-btn" onclick="D.runCmd(\'run\',\''+c+'\')">Update to '+esc(d.current_version)+'</button>';
+        a+='<button class="sp-btn" onclick="D.runCmd(\'upload\',\''+c+'\')">Install (Upload OTA)</button>';
+        a+='<button class="sp-btn" onclick="D.runCmd(\'run\',\''+c+'\')">Install (Compile + Upload)</button>';
+        a+='<button class="sp-btn" onclick="D.installToAddress(\''+c+'\')">Install to Specific Address...</button>';
+        a+='<button class="sp-btn" onclick="D.openYaml(\''+cu+'\')">Edit</button>';
+        a+='<button class="sp-btn" onclick="D.runCmd(\'validate\',\''+c+'\')">Validate</button>';
+        a+='<button class="sp-btn" onclick="D.runCmd(\'compile\',\''+c+'\')">Compile</button>';
+        a+='<button class="sp-btn" onclick="D.runCmd(\'logs\',\''+c+'\')">Logs</button>';
+        if(d.web_port&&d.address)a+='<a class="sp-btn" href="http://'+esc(d.address)+':'+d.web_port+'" target="_blank" rel="noopener">Visit Device</a>';
+        a+='<button class="sp-btn" onclick="D.showApiKey(\''+cu+'\')">Show API Key</button>';
+        a+='<div class="sp-sep"></div>';
+        if(d.inactive){
+          a+='<button class="sp-btn" onclick="D.toggleInactive(\''+c+'\',false)">Mark Active</button>';
+        }else{
+          a+='<button class="sp-btn" onclick="D.toggleInactive(\''+c+'\',true)">Mark Inactive</button>';
+        }
+        a+='<button class="sp-btn sp-btn-danger" onclick="D.archive(\''+c+'\')">Archive</button>';
+        document.getElementById("spActions").innerHTML=a;
 
-      // Utilities — network/diagnostics
-      var u="";
-      u+='<button class="sp-btn" onclick="D.pingHost(\''+c+'\')">Ping Device</button>';
-      u+='<button class="sp-btn" onclick="D.runCmd(\'clean\',\''+c+'\')">Clean Build</button>';
-      u+='<button class="sp-btn" onclick="D.runCmd(\'clean-mqtt\',\''+c+'\')">Clean MQTT</button>';
-      document.getElementById("spUtilities").innerHTML=u;
+        // Utilities
+        u+='<button class="sp-btn" onclick="D.pingHost(\''+c+'\')">Ping Device</button>';
+        u+='<button class="sp-btn" onclick="D.runCmd(\'clean\',\''+c+'\')">Clean Build</button>';
+        u+='<button class="sp-btn" onclick="D.runCmd(\'clean-mqtt\',\''+c+'\')">Clean MQTT</button>';
+        document.getElementById("spUtilities").innerHTML=u;
+        document.querySelector("#spUtilities").parentElement.style.display="";
+      }
 
       $panelOverlay.classList.add("open");
       $sidePanel.classList.add("open");
