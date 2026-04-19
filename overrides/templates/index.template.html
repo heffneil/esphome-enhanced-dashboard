@@ -53,6 +53,37 @@
       cursor: pointer;
     }
     .topbar-add:hover { background: #13a5d6; }
+    .topbar-cols {
+      background: transparent; border: 1px solid #333; color: #aaa; font-family: inherit;
+      font-size: 14px; padding: 3px 9px; border-radius: 4px; cursor: pointer;
+    }
+    .topbar-cols:hover { background: #1a1a1a; color: #fff; }
+
+    /* Columns menu (dropdown for show/hide) */
+    .cols-menu {
+      display: none; position: absolute; right: 20px; top: 46px;
+      background: #141414; border: 1px solid #333; border-radius: 6px;
+      padding: 6px 0; min-width: 180px; z-index: 150;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+      font-family: "Inter", sans-serif;
+    }
+    .cols-menu.open { display: block; }
+    .cols-menu-label {
+      padding: 6px 14px 4px; font-size: 11px; color: #888;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .cols-menu label {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px; font-size: 13px; color: #ccc; cursor: pointer;
+    }
+    .cols-menu label:hover { background: #1e1e1e; color: #fff; }
+    .cols-menu input[type="checkbox"] { margin: 0; cursor: pointer; }
+
+    /* BT Proxy cell */
+    .btproxy-on { color: #18BCF2; font-size: 14px; }
+    .btproxy-off { color: #333; }
+    /* When the BT Proxy column is hidden */
+    table.hide-btproxy th[data-col="btproxy"], table.hide-btproxy td.col-btproxy { display: none; }
 
     /* Wizard form */
     .wizard-field { margin-bottom: 12px; }
@@ -416,9 +447,11 @@
   <div class="topbar-stats" id="statsBar"></div>
   <div class="topbar-links">
     <button class="topbar-add" onclick="D.openWizard()">+ New Device</button>
+    <button class="topbar-cols" onclick="D.openColumns(event)" title="Show/hide columns">&#9776;</button>
     <a href="{% raw relative_url %}classic">Classic</a>
     <a href="{% raw docs_link %}" target="_blank" rel="noopener">Docs</a>
   </div>
+  <div class="cols-menu" id="colsMenu"></div>
 </div>
 
 <div class="tagbar" id="tagbar"></div>
@@ -439,6 +472,7 @@
         <th data-sort="name">Name</th>
         <th data-sort="ip">IP Address</th>
         <th data-sort="platform">Platform</th>
+        <th data-sort="btproxy" data-col="btproxy">BT Proxy</th>
         <th data-sort="version">ESPHome Version</th>
         <th data-sort="comment">Comment</th>
         <th data-sort="tags">Tags</th>
@@ -569,6 +603,13 @@
     else if(sCol==="comment"){va=(a.comment||"").toLowerCase();vb=(b.comment||"").toLowerCase()}
     else if(sCol==="config"){va=(a.configuration||"").toLowerCase();vb=(b.configuration||"").toLowerCase()}
     else if(sCol==="tags"){va=(a.tags||[]).join(",");vb=(b.tags||[]).join(",")}
+    else if(sCol==="btproxy"){
+      // Sort BT proxies first so you can quickly see which devices are proxies
+      var aBt=Array.isArray(a.loaded_integrations)&&a.loaded_integrations.indexOf("bluetooth_proxy")>=0?0:1;
+      var bBt=Array.isArray(b.loaded_integrations)&&b.loaded_integrations.indexOf("bluetooth_proxy")>=0?0:1;
+      if(aBt!==bBt)return sDir==="asc"?aBt-bBt:bBt-aBt;
+      va=(a.friendly_name||a.name||"").toLowerCase();vb=(b.friendly_name||b.name||"").toLowerCase();
+    }
     else if(sCol==="status"){
       va=stOrd(a);vb=stOrd(b);
       if(va!==vb)return sDir==="asc"?va-vb:vb-va;
@@ -610,6 +651,9 @@
     }
     h+="</td>";
     h+="<td>"+(d.target_platform?'<span class="plat">'+esc(d.target_platform)+"</span>":'<span class="muted">-</span>')+"</td>";
+    // BT Proxy column - checkmark when bluetooth_proxy is in loaded_integrations
+    var isBt=Array.isArray(d.loaded_integrations)&&d.loaded_integrations.indexOf("bluetooth_proxy")>=0;
+    h+='<td class="col-btproxy">'+(isBt?'<span class="btproxy-on" title="Bluetooth Proxy enabled">&#10003;</span>':'<span class="btproxy-off">-</span>')+'</td>';
     h+="<td>";
     if(d.deployed_version){
       h+='<span class="ver">'+esc(d.deployed_version)+'</span>';
@@ -658,7 +702,7 @@
     for(var j=0;j<f.length;j++)h+=row(f[j],false);
     if(archived.length){
       var cc=archOpen?"chevron open":"chevron";
-      h+='<tr class="archived-divider" onclick="D.toggleArchived()"><td colspan="9"><span class="'+cc+'">&#9654;</span>Archived<span class="arch-badge">'+archived.length+"</span></td></tr>";
+      h+='<tr class="archived-divider" onclick="D.toggleArchived()"><td colspan="10"><span class="'+cc+'">&#9654;</span>Archived<span class="arch-badge">'+archived.length+"</span></td></tr>";
       if(archOpen)for(var k=0;k<fa.length;k++)h+=row(fa[k],true);
     }
     $tb.innerHTML=h;
@@ -848,6 +892,49 @@
       document.getElementById("cmdModalTitle").textContent=title;
       document.getElementById("cmdOverlay").classList.add("open");
       document.getElementById("cmdModalBody").classList.remove("editor-mode");
+    },
+
+    // Column visibility (persisted in localStorage).
+    // Currently only BT Proxy is toggleable — most users don't need it unless
+    // they use Bluetooth proxy devices.
+    _columns:[
+      ["btproxy","BT Proxy"]
+    ],
+    _colsHidden:function(){
+      try{return JSON.parse(localStorage.getItem("eed.colsHidden")||"[]")}catch(e){return[]}
+    },
+    _setColsHidden:function(arr){
+      try{localStorage.setItem("eed.colsHidden",JSON.stringify(arr))}catch(e){}
+    },
+    applyColumnVisibility:function(){
+      var hidden=D._colsHidden();
+      var tbl=document.querySelector(".table-wrap table");
+      if(!tbl)return;
+      D._columns.forEach(function(c){
+        tbl.classList.toggle("hide-"+c[0],hidden.indexOf(c[0])>=0);
+      });
+    },
+    openColumns:function(e){
+      if(e)e.stopPropagation();
+      var $menu=document.getElementById("colsMenu");
+      if($menu.classList.contains("open")){$menu.classList.remove("open");return}
+      var hidden=D._colsHidden();
+      var html='<div class="cols-menu-label">Show columns</div>';
+      D._columns.forEach(function(c){
+        var isVisible=hidden.indexOf(c[0])<0;
+        html+='<label><input type="checkbox" data-col="'+c[0]+'"'+(isVisible?' checked':'')+' onchange="D._toggleColumn(this)">'+esc(c[1])+'</label>';
+      });
+      $menu.innerHTML=html;
+      $menu.classList.add("open");
+    },
+    _toggleColumn:function(cb){
+      var col=cb.getAttribute("data-col");
+      var hidden=D._colsHidden();
+      var idx=hidden.indexOf(col);
+      if(!cb.checked&&idx<0)hidden.push(col);
+      else if(cb.checked&&idx>=0)hidden.splice(idx,1);
+      D._setColsHidden(hidden);
+      D.applyColumnVisibility();
     },
 
     closeCmdModal:function(){
@@ -1565,6 +1652,13 @@
     setInterval(function(){if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({event:"ping"}))},25000);
   }
 
+  D.applyColumnVisibility();
+  // Close cols menu on outside click
+  document.addEventListener("click",function(e){
+    var $menu=document.getElementById("colsMenu");
+    if(!$menu||!$menu.classList.contains("open"))return;
+    if(!e.target.closest(".cols-menu")&&!e.target.closest(".topbar-cols"))$menu.classList.remove("open");
+  });
   render();
   connectWS();
 })();
