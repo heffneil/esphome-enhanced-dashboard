@@ -1098,10 +1098,15 @@
     },
 
     openWizard:function(){
-      // Platform values must match what esphome.wizard expects (uppercase).
-      // ESP32 variants (S2/S3/C3/C6/H2) are selected via the board dropdown.
+      // [submit-value, label, boards-api-slug]
+      // ESP32 variants all submit as "ESP32" but use variant-specific board API endpoints.
       var platforms=[
-        ["ESP32","ESP32 (original + S2/S3/C3/C6/H2 variants)","esp32"],
+        ["ESP32","ESP32","esp32"],
+        ["ESP32","ESP32-S2","esp32s2"],
+        ["ESP32","ESP32-S3","esp32s3"],
+        ["ESP32","ESP32-C3","esp32c3"],
+        ["ESP32","ESP32-C6","esp32c6"],
+        ["ESP32","ESP32-H2","esp32h2"],
         ["ESP8266","ESP8266","esp8266"],
         ["RP2040","RP2040 (Pi Pico)","rp2040"],
         ["BK72XX","BK72xx (LibreTiny)","bk72xx"],
@@ -1150,12 +1155,20 @@
     },
     _renderBoards:function(plat){
       var $sel=document.getElementById("wizBoard");
-      var data=D._boardsCache[plat]||{};
-      var keys=Object.keys(data).sort();
+      // Backend returns [{"items": {"board_id": "Board Name", ...}}]
+      var raw=D._boardsCache[plat];
+      var items={};
+      if(Array.isArray(raw)&&raw.length&&raw[0].items){
+        items=raw[0].items;
+      }else if(raw&&typeof raw==="object"){
+        items=raw;
+      }
+      // Sort by display name
+      var entries=Object.keys(items).map(function(k){return[k,items[k]||k]});
+      entries.sort(function(a,b){return String(a[1]).localeCompare(String(b[1]))});
       var opts='<option value="">Select board...</option>';
-      keys.forEach(function(k){
-        var name=(data[k]&&data[k].name)||k;
-        opts+='<option value="'+esc(k)+'">'+esc(name)+' ('+esc(k)+')</option>';
+      entries.forEach(function(e){
+        opts+='<option value="'+esc(e[0])+'">'+esc(e[1])+' ('+esc(e[0])+')</option>';
       });
       $sel.innerHTML=opts;
     },
