@@ -99,10 +99,6 @@ Click any device row and a panel slides in from the right with:
 
 ### In-page command output
 
-> _Screenshot: compile modal with colored ANSI output and DOWNLOAD LOGS button_
->
-> ![Compile output modal](docs/screenshots/compile-output.png)
-
 - All commands (logs, compile, validate, install, ping) run in a modal overlay on top of the dashboard
 - ANSI colors preserved — component names, errors, timestamps, all highlighted just like the classic dashboard
 - **DOWNLOAD LOGS** button saves a full .txt of the output
@@ -110,10 +106,6 @@ Click any device row and a panel slides in from the right with:
 - Press `Esc` or click the backdrop to close
 
 ### YAML editor
-
-> _Screenshot: Ace editor modal with YAML syntax highlighting_
->
-> ![YAML editor](docs/screenshots/editor.png)
 
 - Embedded Ace editor with tomorrow-night theme
 - YAML syntax highlighting, auto-indent, line numbers
@@ -143,10 +135,6 @@ Click any device row and a panel slides in from the right with:
 - One click to bring it back
 
 ### New Device wizard
-
-> _Screenshot: New Device modal with name/platform/board/WiFi fields_
->
-> ![New Device wizard](docs/screenshots/new-device.png)
 
 - Click **+ New Device** in the topbar
 - Fill in name, platform (ESP32 family, ESP8266, RP2040, BK72xx, RTL87xx, LN882x), board, WiFi credentials
