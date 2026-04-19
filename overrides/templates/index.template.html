@@ -1098,20 +1098,17 @@
     },
 
     openWizard:function(){
+      // Platform values must match what esphome.wizard expects (uppercase).
+      // ESP32 variants (S2/S3/C3/C6/H2) are selected via the board dropdown.
       var platforms=[
-        ["esp32","ESP32"],
-        ["esp32s2","ESP32-S2"],
-        ["esp32s3","ESP32-S3"],
-        ["esp32c3","ESP32-C3"],
-        ["esp32c6","ESP32-C6"],
-        ["esp32h2","ESP32-H2"],
-        ["esp8266","ESP8266"],
-        ["rp2040","RP2040"],
-        ["bk72xx","BK72xx"],
-        ["rtl87xx","RTL87xx"],
-        ["ln882x","LN882x"]
+        ["ESP32","ESP32 (original + S2/S3/C3/C6/H2 variants)","esp32"],
+        ["ESP8266","ESP8266","esp8266"],
+        ["RP2040","RP2040 (Pi Pico)","rp2040"],
+        ["BK72XX","BK72xx (LibreTiny)","bk72xx"],
+        ["RTL87XX","RTL87xx (LibreTiny)","rtl87xx"],
+        ["LN882X","LN882x (LibreTiny)","ln882x"]
       ];
-      var platOpts=platforms.map(function(p){return '<option value="'+p[0]+'">'+p[1]+'</option>'}).join("");
+      var platOpts=platforms.map(function(p){return '<option value="'+p[0]+'" data-api="'+p[2]+'">'+p[1]+'</option>'}).join("");
 
       var body='<div class="wizard-error" id="wizardError" style="display:none"></div>'+
         '<div class="wizard-field"><label class="wizard-label">Device Name *</label>'+
@@ -1140,14 +1137,15 @@
       setTimeout(function(){document.getElementById("wizName").focus()},30);
     },
     _loadBoards:function(){
-      var plat=document.getElementById("wizPlatform").value;
+      var $plat=document.getElementById("wizPlatform");
       var $sel=document.getElementById("wizBoard");
-      if(!plat){$sel.innerHTML='<option value="">Select platform first...</option>';return}
+      if(!$plat.value){$sel.innerHTML='<option value="">Select platform first...</option>';return}
+      var apiSlug=$plat.options[$plat.selectedIndex].getAttribute("data-api");
       $sel.innerHTML='<option value="">Loading...</option>';
-      if(D._boardsCache[plat]){D._renderBoards(plat);return}
-      fetch(REL+"boards/"+plat,{credentials:"same-origin"})
+      if(D._boardsCache[apiSlug]){D._renderBoards(apiSlug);return}
+      fetch(REL+"boards/"+apiSlug,{credentials:"same-origin"})
         .then(function(r){return r.json()})
-        .then(function(data){D._boardsCache[plat]=data;D._renderBoards(plat)})
+        .then(function(data){D._boardsCache[apiSlug]=data;D._renderBoards(apiSlug)})
         .catch(function(){$sel.innerHTML='<option value="">Failed to load boards</option>'});
     },
     _renderBoards:function(plat){
