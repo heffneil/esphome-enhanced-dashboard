@@ -1104,6 +1104,23 @@
       var ws=new WebSocket(proto+"//"+location.host+REL+endpoint);
       D._cmdWs=ws;
       D._rawLog="";
+      // ESPHome's `run` command does compile + upload + auto-connects to logs
+      // indefinitely. For batch, once we detect a successful upload we close
+      // the connection ourselves and advance to the next device.
+      var uploadDone=false;
+      var advanced=false;
+      var advance=function(ok,code){
+        if(advanced)return;
+        advanced=true;
+        results.push({cfg:cfg,ok:ok,code:(code===undefined?(ok?0:-1):code)});
+        try{ws.close()}catch(e){}
+        var el=document.createElement("div");
+        el.className=ok?"ok":"err";
+        el.textContent=ok?"\n["+(index+1)+"/"+total+"] Success\n":"\n["+(index+1)+"/"+total+"] Failed (exit "+code+")\n";
+        $out.appendChild(el);
+        $body.scrollTop=$body.scrollHeight;
+        setTimeout(function(){D._batchRunSequential(cmd,remaining,verb,index+1,total,results)},500);
+      };
       ws.onopen=function(){
         var msg={type:"spawn",configuration:cfg};
         if(needsPort)msg.port="OTA";
@@ -1117,21 +1134,19 @@
           D._rawLog+=raw;
           $out.insertAdjacentHTML("beforeend",D._ansi(raw));
           $body.scrollTop=$body.scrollHeight;
+          // Advance when we see a successful upload for run/upload commands —
+          // otherwise `run` keeps streaming live logs and never exits.
+          if(cmd==="run"||cmd==="upload"){
+            if(!uploadDone&&/successfully uploaded|OTA successful|successfully completed/i.test(raw)){
+              uploadDone=true;
+              advance(true,0);
+            }
+          }
         }else if(m.event==="exit"){
-          results.push({cfg:cfg,ok:m.code===0,code:m.code});
-          var el=document.createElement("div");
-          el.className=m.code===0?"ok":"err";
-          el.textContent=m.code===0?"\n["+(index+1)+"/"+total+"] Success\n":"\n["+(index+1)+"/"+total+"] Exited with code "+m.code+"\n";
-          $out.appendChild(el);
-          $body.scrollTop=$body.scrollHeight;
-          // Queue next device
-          setTimeout(function(){D._batchRunSequential(cmd,remaining,verb,index+1,total,results)},500);
+          advance(m.code===0,m.code);
         }
       };
-      ws.onerror=function(){
-        results.push({cfg:cfg,ok:false,code:-1});
-        setTimeout(function(){D._batchRunSequential(cmd,remaining,verb,index+1,total,results)},500);
-      };
+      ws.onerror=function(){advance(false,-1)};
     },
 
     // Platform definitions: [submit-value, label, default-board]
