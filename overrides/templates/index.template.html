@@ -1099,19 +1099,18 @@
 
     openWizard:function(){
       // [submit-value, label, boards-api-slug]
-      // ESP32 variants all submit as "ESP32" but use variant-specific board API endpoints.
+      // Matches the classic dashboard's device type picker.
       var platforms=[
         ["ESP32","ESP32","esp32"],
-        ["ESP32","ESP32-S2","esp32s2"],
-        ["ESP32","ESP32-S3","esp32s3"],
         ["ESP32","ESP32-C3","esp32c3"],
         ["ESP32","ESP32-C6","esp32c6"],
-        ["ESP32","ESP32-H2","esp32h2"],
+        ["ESP32","ESP32-S2","esp32s2"],
+        ["ESP32","ESP32-S3","esp32s3"],
         ["ESP8266","ESP8266","esp8266"],
-        ["RP2040","RP2040 (Pi Pico)","rp2040"],
-        ["BK72XX","BK72xx (LibreTiny)","bk72xx"],
-        ["RTL87XX","RTL87xx (LibreTiny)","rtl87xx"],
-        ["LN882X","LN882x (LibreTiny)","ln882x"]
+        ["RP2040","Raspberry Pi Pico W","rp2040"],
+        ["BK72XX","BK72xx","bk72xx"],
+        ["LN882X","LN882x","ln882x"],
+        ["RTL87XX","RTL87xx","rtl87xx"]
       ];
       var platOpts=platforms.map(function(p){return '<option value="'+p[0]+'" data-api="'+p[2]+'">'+p[1]+'</option>'}).join("");
 
