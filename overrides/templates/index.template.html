@@ -70,6 +70,43 @@
       font-family: "Inter", sans-serif;
     }
 
+    /* Wizard platform picker (matches classic's list view) */
+    .wizard-platform-list { display: flex; flex-direction: column; gap: 2px; }
+    .wizard-platform-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; background: none; border: none; border-bottom: 1px solid #222;
+      color: #e0e0e0; font-size: 15px; font-family: "Inter", sans-serif; cursor: pointer;
+      text-align: left;
+    }
+    .wizard-platform-row:hover { background: #1a1a1a; }
+    .wizard-platform-row:last-child { border-bottom: none; }
+    .wizard-platform-chev { color: #666; font-size: 20px; font-weight: 300; }
+    .wizard-platform-row:hover .wizard-platform-chev { color: #18BCF2; }
+
+    /* Success / encryption key display */
+    .wizard-success {
+      text-align: center; padding: 10px 4px 4px;
+      font-family: "Inter", sans-serif;
+    }
+    .wizard-success-emoji { font-size: 32px; margin-bottom: 8px; }
+    .wizard-success-title { font-size: 16px; color: #fff; font-weight: 600; margin-bottom: 14px; }
+    .wizard-success p {
+      font-size: 13px; color: #c8c8d4; line-height: 1.55; margin-bottom: 12px; text-align: left;
+    }
+    .wizard-key-box {
+      background: #0a0a0a; border: 1px solid #18BCF2; border-radius: 4px;
+      padding: 10px 12px; margin: 12px 0 4px; text-align: left;
+    }
+    .wizard-key-label {
+      font-size: 11px; color: #18BCF2; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 4px;
+    }
+    .wizard-key-value {
+      font-family: "SF Mono","Fira Code",Menlo,Consolas,monospace;
+      font-size: 13px; color: #e0e0e0; word-break: break-all;
+      user-select: all; -webkit-user-select: all; cursor: text;
+    }
+
     /* Tag bar */
     .tagbar { background: #0e0e0e; border-bottom: 1px solid #222; padding: 6px 20px; display: none; flex-wrap: wrap; gap: 6px; align-items: center; }
     .tagbar.visible { display: flex; }
@@ -1097,111 +1134,125 @@
       };
     },
 
+    // Platform definitions: [submit-value, label, default-board]
+    // Matches the classic dashboard's new device flow.
+    _wizardPlatforms:[
+      ["ESP32","ESP32","esp32dev"],
+      ["ESP32","ESP32-C3","esp32-c3-devkitm-1"],
+      ["ESP32","ESP32-C6","esp32-c6-devkitc-1"],
+      ["ESP32","ESP32-S2","esp32-s2-saola-1"],
+      ["ESP32","ESP32-S3","esp32-s3-devkitc-1"],
+      ["ESP8266","ESP8266","esp01_1m"],
+      ["RP2040","Raspberry Pi Pico W","rpipicow"],
+      ["BK72XX","BK72xx","generic-bk7231n-qfn32-tuya"],
+      ["LN882X","LN882x","generic-ln882h-qfn48-tuya"],
+      ["RTL87XX","RTL87xx","wr3"]
+    ],
     openWizard:function(){
-      // [submit-value, label, boards-api-slug]
-      // Matches the classic dashboard's device type picker.
-      var platforms=[
-        ["ESP32","ESP32","esp32"],
-        ["ESP32","ESP32-C3","esp32c3"],
-        ["ESP32","ESP32-C6","esp32c6"],
-        ["ESP32","ESP32-S2","esp32s2"],
-        ["ESP32","ESP32-S3","esp32s3"],
-        ["ESP8266","ESP8266","esp8266"],
-        ["RP2040","Raspberry Pi Pico W","rp2040"],
-        ["BK72XX","BK72xx","bk72xx"],
-        ["LN882X","LN882x","ln882x"],
-        ["RTL87XX","RTL87xx","rtl87xx"]
-      ];
-      var platOpts=platforms.map(function(p){return '<option value="'+p[0]+'" data-api="'+p[2]+'">'+p[1]+'</option>'}).join("");
-
+      // Step 1: Ask for device name
       var body='<div class="wizard-error" id="wizardError" style="display:none"></div>'+
         '<div class="wizard-field"><label class="wizard-label">Device Name *</label>'+
           '<input class="wizard-input" id="wizName" placeholder="e.g. Living Room Sensor" autocomplete="off">'+
-          '<div class="wizard-help">Use a friendly name. Spaces and capitals are fine.</div></div>'+
-        '<div class="wizard-field"><label class="wizard-label">Platform *</label>'+
-          '<select class="wizard-select" id="wizPlatform" onchange="D._loadBoards()">'+
-            '<option value="">Select platform...</option>'+platOpts+
-          '</select></div>'+
-        '<div class="wizard-field"><label class="wizard-label">Board *</label>'+
-          '<select class="wizard-select" id="wizBoard"><option value="">Select platform first...</option></select></div>'+
-        '<div class="wizard-field"><label class="wizard-label">WiFi SSID *</label>'+
-          '<input class="wizard-input" id="wizSsid" placeholder="Your WiFi network name" autocomplete="off"></div>'+
-        '<div class="wizard-field"><label class="wizard-label">WiFi Password</label>'+
-          '<input class="wizard-input" id="wizPsk" type="password" placeholder="Leave blank for open networks" autocomplete="off"></div>'+
-        '<div class="wizard-field"><label class="wizard-label">Device Password (optional)</label>'+
-          '<input class="wizard-input" id="wizDevicePw" type="password" placeholder="Used to secure OTA uploads" autocomplete="off"></div>';
+          '<div class="wizard-help">WiFi credentials will be pulled from secrets.yaml (wifi_ssid / wifi_password).</div></div>';
 
-      document.getElementById("dlgTitle").textContent="New Device";
+      document.getElementById("dlgTitle").textContent="New Device — Name";
       document.getElementById("dlgBody").innerHTML=body;
       document.getElementById("dlgFooter").innerHTML=
         '<button class="dlg-btn" onclick="D._closeDlg(null)">Cancel</button>'+
-        '<button class="dlg-btn dlg-btn-primary" onclick="D._submitWizard()">Create Device</button>';
+        '<button class="dlg-btn dlg-btn-primary" onclick="D._wizardShowPlatforms()">Next</button>';
       document.getElementById("dlgOverlay").classList.add("open");
       D._dlgResolver=function(){};
-      setTimeout(function(){document.getElementById("wizName").focus()},30);
+      setTimeout(function(){
+        var $i=document.getElementById("wizName");
+        $i.focus();
+        $i.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();D._wizardShowPlatforms()}});
+      },30);
     },
-    _loadBoards:function(){
-      var $plat=document.getElementById("wizPlatform");
-      var $sel=document.getElementById("wizBoard");
-      if(!$plat.value){$sel.innerHTML='<option value="">Select platform first...</option>';return}
-      var apiSlug=$plat.options[$plat.selectedIndex].getAttribute("data-api");
-      $sel.innerHTML='<option value="">Loading...</option>';
-      if(D._boardsCache[apiSlug]){D._renderBoards(apiSlug);return}
-      fetch(REL+"boards/"+apiSlug,{credentials:"same-origin"})
-        .then(function(r){return r.json()})
-        .then(function(data){D._boardsCache[apiSlug]=data;D._renderBoards(apiSlug)})
-        .catch(function(){$sel.innerHTML='<option value="">Failed to load boards</option>'});
-    },
-    _renderBoards:function(plat){
-      var $sel=document.getElementById("wizBoard");
-      // Backend returns [{"items": {"board_id": "Board Name", ...}}]
-      var raw=D._boardsCache[plat];
-      var items={};
-      if(Array.isArray(raw)&&raw.length&&raw[0].items){
-        items=raw[0].items;
-      }else if(raw&&typeof raw==="object"){
-        items=raw;
+    _wizardShowPlatforms:function(){
+      var name=(document.getElementById("wizName")||{}).value;
+      if(!name||!name.trim()){
+        var $err=document.getElementById("wizardError");
+        if($err){$err.textContent="Device name is required";$err.style.display="block"}
+        return;
       }
-      // Sort by display name
-      var entries=Object.keys(items).map(function(k){return[k,items[k]||k]});
-      entries.sort(function(a,b){return String(a[1]).localeCompare(String(b[1]))});
-      var opts='<option value="">Select board...</option>';
-      entries.forEach(function(e){
-        opts+='<option value="'+esc(e[0])+'">'+esc(e[1])+' ('+esc(e[0])+')</option>';
+      D._wizardName=name.trim();
+      // Step 2: Device type picker
+      var listHtml='<div class="wizard-error" id="wizardError" style="display:none"></div>'+
+        '<div class="wizard-help" style="margin-bottom:10px">Select the type of device that this configuration will be installed on.</div>'+
+        '<div class="wizard-platform-list">';
+      D._wizardPlatforms.forEach(function(p,idx){
+        listHtml+='<button class="wizard-platform-row" onclick="D._wizardPickPlatform('+idx+')">'+
+          '<span>'+esc(p[1])+'</span>'+
+          '<span class="wizard-platform-chev">&#x203A;</span>'+
+        '</button>';
       });
-      $sel.innerHTML=opts;
+      listHtml+='</div>';
+      document.getElementById("dlgTitle").textContent="Select your device type";
+      document.getElementById("dlgBody").innerHTML=listHtml;
+      document.getElementById("dlgFooter").innerHTML=
+        '<button class="dlg-btn" onclick="D.openWizard()">&lsaquo; Back</button>'+
+        '<button class="dlg-btn" onclick="D._closeDlg(null)">Cancel</button>';
     },
-    _submitWizard:function(){
-      var name=document.getElementById("wizName").value.trim();
-      var plat=document.getElementById("wizPlatform").value;
-      var board=document.getElementById("wizBoard").value;
-      var ssid=document.getElementById("wizSsid").value;
-      var psk=document.getElementById("wizPsk").value;
-      var devicePw=document.getElementById("wizDevicePw").value;
-      var $err=document.getElementById("wizardError");
-      $err.style.display="none";
-      var showErr=function(msg){$err.textContent=msg;$err.style.display="block"};
-      if(!name){showErr("Device name is required");return}
-      if(!plat){showErr("Please select a platform");return}
-      if(!board){showErr("Please select a board");return}
-      if(!ssid){showErr("WiFi SSID is required");return}
+    _wizardPickPlatform:function(idx){
+      var p=D._wizardPlatforms[idx];
+      if(!p)return;
+      var platform=p[0];
+      var board=p[2];
+      // Show progress
+      document.getElementById("dlgBody").innerHTML=
+        '<div class="wizard-help">Creating <b>'+esc(D._wizardName)+'</b> ('+esc(p[1])+')...</div>';
+      document.getElementById("dlgFooter").innerHTML='';
 
       var headers={"Content-Type":"application/json"};
       var x=getXsrf();if(x)headers["X-Xsrftoken"]=x;
       fetch(REL+"wizard",{
         method:"POST",credentials:"same-origin",headers:headers,
-        body:JSON.stringify({type:"basic",name:name,platform:plat,board:board,ssid:ssid,psk:psk,password:devicePw})
+        body:JSON.stringify({type:"basic",name:D._wizardName,platform:platform,board:board,ssid:"!secret wifi_ssid",psk:"!secret wifi_password"})
       })
       .then(function(r){return r.json().then(function(j){return{ok:r.ok,status:r.status,data:j}})})
       .then(function(resp){
         if(resp.ok){
-          D._closeDlg(null);
           refresh();
+          D._wizardShowSuccess(resp.data.configuration,resp.data.api_encryption_key);
         }else{
-          showErr(resp.data.error||("Failed to create device ("+resp.status+")"));
+          D._wizardShowError(resp.data.error||("Failed to create device ("+resp.status+")"));
         }
       })
-      .catch(function(err){showErr("Request failed: "+err)});
+      .catch(function(err){D._wizardShowError("Request failed: "+err)});
+    },
+    _wizardShowSuccess:function(configuration,apiKey){
+      var keyBlock="";
+      if(apiKey){
+        keyBlock='<div class="wizard-key-box">'+
+          '<div class="wizard-key-label">Encryption key</div>'+
+          '<div class="wizard-key-value">'+esc(apiKey)+'</div>'+
+        '</div>';
+      }
+      document.getElementById("dlgTitle").textContent="";
+      document.getElementById("dlgBody").innerHTML=
+        '<div class="wizard-success">'+
+          '<div class="wizard-success-emoji">&#x1F389;</div>'+
+          '<div class="wizard-success-title">Configuration created!</div>'+
+          '<p>You can now install the configuration to your device. The first time this requires a cable.</p>'+
+          '<p>Once the device is installed and connected to your network, you will be able to manage it wirelessly.</p>'+
+          (apiKey?'<p>Each ESPHome device has a unique encryption key to talk to other devices. You will need this key to include your device in Home Assistant. You can find the key later in the device menu.</p>':'')+
+          keyBlock+
+        '</div>';
+      document.getElementById("dlgFooter").innerHTML=
+        '<button class="dlg-btn" onclick="D._closeDlg(null)">Skip</button>'+
+        '<button class="dlg-btn dlg-btn-primary" onclick="D._wizardInstall(\''+encodeURIComponent(configuration)+'\')">Install</button>';
+    },
+    _wizardInstall:function(cfgEnc){
+      var cfg=decodeURIComponent(cfgEnc);
+      D._closeDlg(null);
+      D.runCmd("run",cfg);
+    },
+    _wizardShowError:function(msg){
+      document.getElementById("dlgBody").innerHTML=
+        '<div class="wizard-error" style="display:block">'+esc(msg)+'</div>'+
+        '<div class="wizard-help" style="margin-top:10px">You may need to create a secrets.yaml with wifi_ssid and wifi_password entries first.</div>';
+      document.getElementById("dlgFooter").innerHTML=
+        '<button class="dlg-btn dlg-btn-primary" onclick="D._closeDlg(null)">Close</button>';
     },
 
     installToAddress:function(cfg){

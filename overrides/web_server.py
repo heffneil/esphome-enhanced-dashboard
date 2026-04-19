@@ -874,7 +874,10 @@ class WizardRequestHandler(BaseHandler):
         if success:
             self.set_status(200)
             self.set_header("content-type", "application/json")
-            self.write(json.dumps({"configuration": filename}))
+            response = {"configuration": filename}
+            if kwargs.get("api_encryption_key"):
+                response["api_encryption_key"] = kwargs["api_encryption_key"]
+            self.write(json.dumps(response))
             self.finish()
         else:
             self.set_status(500)
