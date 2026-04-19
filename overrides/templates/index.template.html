@@ -93,6 +93,8 @@
     .batch-btn:hover { background: #222; color: #fff; }
     .batch-btn-primary { background: #18BCF2; border-color: #18BCF2; color: #000; font-weight: 600; }
     .batch-btn-primary:hover { background: #13a5d6; color: #000; }
+    .batch-btn-danger { border-color: #553333; color: #cc6666; }
+    .batch-btn-danger:hover { background: #2a1515; color: #ff6666; }
 
     /* Checkbox column */
     .col-check { width: 34px; }
@@ -389,6 +391,7 @@
     <span class="batch-count" id="batchCount">0 selected</span>
     <button class="batch-btn batch-btn-primary" onclick="D.batchUpdate()">Update Selected</button>
     <button class="batch-btn" onclick="D.batchCompile()">Compile Selected</button>
+    <button class="batch-btn batch-btn-danger" onclick="D.batchArchive()">Archive Selected</button>
     <button class="batch-btn" onclick="D.batchClearSelection()">Clear</button>
   </div>
   <table>
@@ -987,6 +990,41 @@
       var cfgs=Object.keys(selected);
       if(!cfgs.length)return;
       D._runBatchQueue("compile",cfgs,"Compile");
+    },
+    batchArchive:function(){
+      var cfgs=Object.keys(selected);
+      if(!cfgs.length)return;
+      D.dlgConfirm("Archive "+cfgs.length+" device"+(cfgs.length===1?"":"s")+"?",
+        '<div>The following devices will be archived. Their YAML files will move to the archive folder and they will disappear from the main list:</div>'+
+        '<div style="margin-top:8px;color:#888;font-size:12px;max-height:200px;overflow-y:auto">'+
+        cfgs.map(esc).join("<br>")+'</div>'+
+        '<div class="warn" style="margin-top:10px">Archived configs can be restored later from the Archived section at the bottom of the list.</div>',
+        {okLabel:"Archive All",danger:true}
+      ).then(function(ok){
+        if(!ok)return;
+        // Archive in parallel - these are simple file moves, no need to serialize
+        var remaining=cfgs.slice();
+        var results=[];
+        function archiveNext(){
+          if(!remaining.length){
+            refresh();
+            D.batchClearSelection();
+            var failed=results.filter(function(r){return !r.ok});
+            if(failed.length){
+              D.dlgAlert("Archive complete with errors",
+                '<div>'+(results.length-failed.length)+' archived successfully, '+failed.length+' failed:</div>'+
+                '<div style="margin-top:10px;font-size:12px;color:#ff6666">'+
+                failed.map(function(r){return esc(r.cfg)+': '+esc(r.error||"unknown error")}).join("<br>")+'</div>');
+            }
+            return;
+          }
+          var cfg=remaining.shift();
+          postForm(REL+"archive?configuration="+encodeURIComponent(cfg))
+            .then(function(r){results.push({cfg:cfg,ok:r.ok,error:r.ok?null:"HTTP "+r.status});archiveNext()})
+            .catch(function(e){results.push({cfg:cfg,ok:false,error:String(e)});archiveNext()});
+        }
+        archiveNext();
+      });
     },
     _runBatchQueue:function(cmd,cfgs,verb){
       D.dlgConfirm(verb+" "+cfgs.length+" device"+(cfgs.length===1?"":"s")+"?",
