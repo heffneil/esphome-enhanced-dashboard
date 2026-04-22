@@ -549,7 +549,19 @@
 <script>
 (function(){
   "use strict";
-  var REL="{% raw relative_url %}";
+  // When running under Home Assistant ingress the page is served at
+  // /api/hassio_ingress/<token>/ but relative_url from the backend is "/".
+  // Using "/" as an absolute fetch prefix would bypass the ingress path.
+  // Derive the URL base from the document's current location instead.
+  var REL=(function(){
+    var backendRel="{% raw relative_url %}";
+    if(backendRel==="/"){
+      var p=location.pathname;
+      if(!p.endsWith("/"))p=p.substring(0,p.lastIndexOf("/")+1);
+      return p;
+    }
+    return backendRel;
+  })();
 
   var devices=[],archived=[],ping={},selected={};
   var search="",activeTags=[],archOpen=false,sCol="name",sDir="asc",editingConfig=null,panelConfig=null;
