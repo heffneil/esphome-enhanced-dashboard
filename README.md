@@ -146,7 +146,26 @@ Click any device row and a panel slides in from the right with:
 
 ## Install
 
-### Option 1: Docker image (recommended)
+### Option 1: Home Assistant add-on (for HAOS / HA Supervised users)
+
+If you run Home Assistant OS or Home Assistant Supervised, you can install this as a drop-in replacement for the official ESPHome add-on.
+
+[![Open your Home Assistant instance and show the add add-on repository dialog.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fheffneil%2Fesphome-enhanced-dashboard-addon)
+
+Or manually:
+
+1. In Home Assistant, open **Settings → Add-ons → Add-on Store**
+2. Click the three-dot menu (⋮) in the top right → **Repositories**
+3. Paste: `https://github.com/heffneil/esphome-enhanced-dashboard-addon`
+4. Click **Add**, close the dialog, refresh the store
+5. Find **ESPHome Enhanced Dashboard** and click **Install**
+6. Start it and open via the sidebar
+
+The add-on is built on top of the official ESPHome add-on image — discovery, ingress, auth, PlatformIO toolchains, and every other HA integration work exactly the same. Uninstall the official ESPHome add-on first to free port 6052.
+
+Source: https://github.com/heffneil/esphome-enhanced-dashboard-addon
+
+### Option 2: Docker image (for Docker Compose / docker run users)
 
 Swap your image name. No volume mounts, no file copying — everything is baked in.
 
@@ -180,7 +199,7 @@ docker run -d \
   heffneil/esphome-enhanced-dashboard:latest
 ```
 
-### Option 2: Volume mount overrides
+### Option 3: Volume mount overrides
 
 Keep the official ESPHome image and overlay just the dashboard files:
 
@@ -208,7 +227,7 @@ services:
       - /opt/esphome-dashboard/overrides/templates:/esphome/esphome/dashboard/templates
 ```
 
-### Option 3: Build from source
+### Option 4: Build from source
 
 ```bash
 git clone https://github.com/heffneil/esphome-enhanced-dashboard.git
@@ -233,19 +252,21 @@ docker build --build-arg BASE_VERSION=2026.4.1 -t my-esphome-dashboard .
 
 ## Upgrading
 
-**Docker image (Option 1):**
+**HA add-on (Option 1):** Home Assistant shows "Update available" in the add-on page — click Update.
+
+**Docker image (Option 2):**
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-**Volume mounts (Option 2):**
+**Volume mounts (Option 3):**
 ```bash
 cd /opt/esphome-dashboard
 git pull
 docker restart esphome
 ```
 
-**Build from source (Option 3):**
+**Build from source (Option 4):**
 ```bash
 cd esphome-enhanced-dashboard
 git pull
