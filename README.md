@@ -4,7 +4,7 @@ A modern, dark-themed replacement for the stock ESPHome dashboard. Built as an o
 
 The original ESPHome dashboard is preserved and available at `/classic`.
 
-**Current base:** ESPHome 2026.4.0
+**Current base:** ESPHome 2026.4.1
 **Docker image:** [`heffneil/esphome-enhanced-dashboard`](https://hub.docker.com/r/heffneil/esphome-enhanced-dashboard)
 **Upstream PR:** [esphome/esphome#15704](https://github.com/esphome/esphome/pull/15704)
 
@@ -219,14 +219,14 @@ docker build -t my-esphome-dashboard .
 Pin to a specific ESPHome version:
 
 ```bash
-docker build --build-arg BASE_VERSION=2026.4.0 -t my-esphome-dashboard .
+docker build --build-arg BASE_VERSION=2026.4.1 -t my-esphome-dashboard .
 ```
 
 ### Image tags
 
 - **`:latest`** — stable, only updated after testing
 - **`:dev`** — development build, may contain unreleased features
-- **`:2026.4.0`** — pinned to a specific ESPHome base version
+- **`:2026.4.1`** — pinned to a specific ESPHome base version
 - **`:v0.1.0`, `:v0.2.0`** — pinned release versions
 
 ---
