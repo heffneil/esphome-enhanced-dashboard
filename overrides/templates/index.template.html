@@ -58,6 +58,11 @@
       font-size: 14px; padding: 3px 9px; border-radius: 4px; cursor: pointer;
     }
     .topbar-cols:hover { background: #1a1a1a; color: #fff; }
+    .topbar-secrets {
+      background: transparent; border: 1px solid #333; color: #aaa; font-family: inherit;
+      font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    }
+    .topbar-secrets:hover { background: #1a1a1a; color: #fff; }
 
     /* Columns menu (dropdown for show/hide) */
     .cols-menu {
@@ -453,6 +458,7 @@
   <div class="topbar-stats" id="statsBar"></div>
   <div class="topbar-links">
     <button class="topbar-add" onclick="D.openWizard()">+ New Device</button>
+    <button class="topbar-secrets" onclick="D.openSecrets()" title="Edit secrets.yaml">Secrets</button>
     <button class="topbar-cols" onclick="D.openColumns(event)" title="Show/hide columns">&#9776;</button>
     <a href="classic">Classic</a>
     <a href="{% raw docs_link %}" target="_blank" rel="noopener">Docs</a>
@@ -1427,6 +1433,14 @@
         document.head.appendChild(s);
       });
       return D._acePromise;
+    },
+
+    openSecrets:function(){
+      // secrets.yaml is a top-level file in the config dir. The /edit
+      // endpoint explicitly treats it as a special case and returns an
+      // empty body when the file doesn't exist, so you can create it
+      // by typing and saving.
+      D.openYaml(encodeURIComponent("secrets.yaml"));
     },
 
     openYaml:function(cfgEncoded){
