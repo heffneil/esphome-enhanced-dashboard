@@ -82,8 +82,14 @@
     /* BT Proxy cell */
     .btproxy-on { color: #18BCF2; font-size: 14px; }
     .btproxy-off { color: #333; }
-    /* When the BT Proxy column is hidden */
-    table.hide-btproxy th[data-col="btproxy"], table.hide-btproxy td.col-btproxy { display: none; }
+    /* Column hiding — matches table.hide-<col> to th[data-col=<col>] and td.col-<col> */
+    table.hide-ip th[data-col="ip"],             table.hide-ip td.col-ip             { display: none; }
+    table.hide-platform th[data-col="platform"], table.hide-platform td.col-platform { display: none; }
+    table.hide-btproxy th[data-col="btproxy"],   table.hide-btproxy td.col-btproxy   { display: none; }
+    table.hide-version th[data-col="version"],   table.hide-version td.col-version   { display: none; }
+    table.hide-comment th[data-col="comment"],   table.hide-comment td.col-comment   { display: none; }
+    table.hide-tags th[data-col="tags"],         table.hide-tags td.col-tags         { display: none; }
+    table.hide-config th[data-col="config"],     table.hide-config td.col-config     { display: none; }
 
     /* Wizard form */
     .wizard-field { margin-bottom: 12px; }
@@ -470,13 +476,13 @@
         <th class="col-check no-sort"><input type="checkbox" id="selectAll" onclick="D.toggleSelectAll(this)"></th>
         <th data-sort="status">Status</th>
         <th data-sort="name">Name</th>
-        <th data-sort="ip">IP Address</th>
-        <th data-sort="platform">Platform</th>
+        <th data-sort="ip" data-col="ip">IP Address</th>
+        <th data-sort="platform" data-col="platform">Platform</th>
         <th data-sort="btproxy" data-col="btproxy">BT Proxy</th>
-        <th data-sort="version">ESPHome Version</th>
-        <th data-sort="comment">Comment</th>
-        <th data-sort="tags">Tags</th>
-        <th data-sort="config">Config File</th>
+        <th data-sort="version" data-col="version">ESPHome Version</th>
+        <th data-sort="comment" data-col="comment">Comment</th>
+        <th data-sort="tags" data-col="tags">Tags</th>
+        <th data-sort="config" data-col="config">Config File</th>
       </tr>
     </thead>
     <tbody id="tb"></tbody>
@@ -651,7 +657,7 @@
     h+='<td><span class="dot '+st+'"></span></td>';
     h+='<td><span class="cell-name">'+esc(d.friendly_name||d.name)+"</span></td>";
     // IP column — link to web UI if the device has a web_server enabled
-    h+="<td>";
+    h+='<td class="col-ip">';
     if(d.address){
       if(d.web_port&&!isArch){
         h+='<a class="ip" href="http://'+esc(d.address)+':'+d.web_port+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open device web UI">'+esc(d.address)+'</a>';
@@ -662,22 +668,22 @@
       h+='<span class="muted">-</span>';
     }
     h+="</td>";
-    h+="<td>"+(d.target_platform?'<span class="plat">'+esc(d.target_platform)+"</span>":'<span class="muted">-</span>')+"</td>";
+    h+='<td class="col-platform">'+(d.target_platform?'<span class="plat">'+esc(d.target_platform)+"</span>":'<span class="muted">-</span>')+"</td>";
     // BT Proxy column - checkmark when bluetooth_proxy is in loaded_integrations
     var isBt=Array.isArray(d.loaded_integrations)&&d.loaded_integrations.indexOf("bluetooth_proxy")>=0;
     h+='<td class="col-btproxy">'+(isBt?'<span class="btproxy-on" title="Bluetooth Proxy enabled">&#10003;</span>':'<span class="btproxy-off">-</span>')+'</td>';
-    h+="<td>";
+    h+='<td class="col-version">';
     if(d.deployed_version){
       h+='<span class="ver">'+esc(d.deployed_version)+'</span>';
       if(hasUpd)h+=' <span class="ver-update">(Update Available)</span>';
     }else h+='<span class="muted">-</span>';
     h+="</td>";
-    h+='<td><span class="cell-comment">'+esc(d.comment||"-")+"</span></td>";
-    h+='<td style="cursor:pointer" onclick="event.stopPropagation();D.openTagEdit(\''+c+'\')">';
+    h+='<td class="col-comment"><span class="cell-comment">'+esc(d.comment||"-")+"</span></td>";
+    h+='<td class="col-tags" style="cursor:pointer" onclick="event.stopPropagation();D.openTagEdit(\''+c+'\')">';
     for(var i=0;i<tags.length;i++)h+='<span class="tag-pill">'+esc(tags[i])+"</span>";
     if(!tags.length)h+='<span class="muted">+ add</span>';
     h+="</td>";
-    h+='<td><span class="cell-config">'+esc(d.configuration)+"</span></td>";
+    h+='<td class="col-config"><span class="cell-config">'+esc(d.configuration)+"</span></td>";
     h+="</tr>";
     return h;
   }
@@ -907,10 +913,16 @@
     },
 
     // Column visibility (persisted in localStorage).
-    // Currently only BT Proxy is toggleable — most users don't need it unless
-    // they use Bluetooth proxy devices.
+    // Column identifiers must match data-col on <th> and col-* class on <td>.
+    // Status and Name are intentionally excluded — hiding them breaks the UI.
     _columns:[
-      ["btproxy","BT Proxy"]
+      ["ip","IP Address"],
+      ["platform","Platform"],
+      ["btproxy","BT Proxy"],
+      ["version","ESPHome Version"],
+      ["comment","Comment"],
+      ["tags","Tags"],
+      ["config","Config File"]
     ],
     _colsHidden:function(){
       try{return JSON.parse(localStorage.getItem("eed.colsHidden")||"[]")}catch(e){return[]}
