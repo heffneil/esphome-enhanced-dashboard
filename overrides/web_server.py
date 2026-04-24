@@ -713,10 +713,35 @@ class DashboardEventsWebSocket(CheckOriginMixin, tornado.websocket.WebSocketHand
         self, event_type: DashboardEvent
     ) -> Callable[[Event], None]:
         """Create an entry event handler."""
+        from pathlib import Path
+        from .models import _info_from_yaml
 
         def handler(event: Event) -> None:
+            entry = event.data["entry"]
+            d = dict(entry.to_dict())
+            d["tags"] = DASHBOARD.device_tags.get(entry.filename, [])
+            d["inactive"] = entry.filename in DASHBOARD.inactive_devices
+            # Fill in YAML-derived fields the same way build_device_list_response
+            # does for the initial state, so live events don't overwrite the
+            # frontend's device object with bare entry.to_dict() data.
+            try:
+                stem = Path(entry.filename).stem
+                config_path = Path(DASHBOARD.settings.rel_path(entry.filename))
+                if config_path.exists():
+                    yaml_info = _info_from_yaml(config_path)
+                    if "name" in yaml_info:
+                        d["name"] = yaml_info["name"]
+                    if "friendly_name" in yaml_info and (
+                        not d.get("friendly_name") or d.get("friendly_name") == stem
+                    ):
+                        d["friendly_name"] = yaml_info["friendly_name"]
+                    for key in ("target_platform", "comment"):
+                        if not d.get(key) and yaml_info.get(key):
+                            d[key] = yaml_info[key]
+            except Exception:  # pylint: disable=broad-except
+                pass
             self._safe_send_message(
-                {"event": event_type, "data": {"device": event.data["entry"].to_dict()}}
+                {"event": event_type, "data": {"device": d}}
             )
 
         return handler

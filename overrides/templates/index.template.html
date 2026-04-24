@@ -89,6 +89,7 @@
     .btproxy-off { color: #333; }
     /* Column hiding — matches table.hide-<col> to th[data-col=<col>] and td.col-<col> */
     table.hide-ip th[data-col="ip"],             table.hide-ip td.col-ip             { display: none; }
+    table.hide-friendlyname th[data-col="friendlyname"], table.hide-friendlyname td.col-friendlyname { display: none; }
     table.hide-platform th[data-col="platform"], table.hide-platform td.col-platform { display: none; }
     table.hide-btproxy th[data-col="btproxy"],   table.hide-btproxy td.col-btproxy   { display: none; }
     table.hide-version th[data-col="version"],   table.hide-version td.col-version   { display: none; }
@@ -482,6 +483,7 @@
         <th class="col-check no-sort"><input type="checkbox" id="selectAll" onclick="D.toggleSelectAll(this)"></th>
         <th data-sort="status">Status</th>
         <th data-sort="name">Name</th>
+        <th data-sort="friendlyname" data-col="friendlyname">Friendly Name</th>
         <th data-sort="ip" data-col="ip">IP Address</th>
         <th data-sort="platform" data-col="platform">Platform</th>
         <th data-sort="btproxy" data-col="btproxy">BT Proxy</th>
@@ -615,7 +617,8 @@
 
   function cmp(a,b){
     var va,vb;
-    if(sCol==="name"){va=(a.friendly_name||a.name||"").toLowerCase();vb=(b.friendly_name||b.name||"").toLowerCase()}
+    if(sCol==="name"){va=(a.name||a.friendly_name||"").toLowerCase();vb=(b.name||b.friendly_name||"").toLowerCase()}
+    else if(sCol==="friendlyname"){va=(a.friendly_name||"").toLowerCase();vb=(b.friendly_name||"").toLowerCase()}
     else if(sCol==="ip"){
       va=a.address||"";vb=b.address||"";
       var pa=va.split(".").map(Number),pb=vb.split(".").map(Number);
@@ -632,12 +635,12 @@
       var aBt=Array.isArray(a.loaded_integrations)&&a.loaded_integrations.indexOf("bluetooth_proxy")>=0?0:1;
       var bBt=Array.isArray(b.loaded_integrations)&&b.loaded_integrations.indexOf("bluetooth_proxy")>=0?0:1;
       if(aBt!==bBt)return sDir==="asc"?aBt-bBt:bBt-aBt;
-      va=(a.friendly_name||a.name||"").toLowerCase();vb=(b.friendly_name||b.name||"").toLowerCase();
+      va=(a.name||a.friendly_name||"").toLowerCase();vb=(b.name||b.friendly_name||"").toLowerCase();
     }
     else if(sCol==="status"){
       va=stOrd(a);vb=stOrd(b);
       if(va!==vb)return sDir==="asc"?va-vb:vb-va;
-      va=(a.friendly_name||a.name||"").toLowerCase();vb=(b.friendly_name||b.name||"").toLowerCase();
+      va=(a.name||a.friendly_name||"").toLowerCase();vb=(b.name||b.friendly_name||"").toLowerCase();
     }
     if(va<vb)return sDir==="asc"?-1:1;
     if(va>vb)return sDir==="asc"?1:-1;
@@ -661,7 +664,8 @@
       h+='<td class="col-check" onclick="event.stopPropagation()"><input type="checkbox" class="row-check" data-config="'+c+'"'+checked+' onclick="D.toggleRowSelect(this)"></td>';
     }
     h+='<td><span class="dot '+st+'"></span></td>';
-    h+='<td><span class="cell-name">'+esc(d.friendly_name||d.name)+"</span></td>";
+    h+='<td><span class="cell-name">'+esc(d.name||d.configuration.replace(/\.ya?ml$/i,""))+"</span></td>";
+    h+='<td class="col-friendlyname">'+(d.friendly_name?esc(d.friendly_name):'<span class="muted">-</span>')+"</td>";
     // IP column — link to web UI if the device has a web_server enabled
     h+='<td class="col-ip">';
     if(d.address){
@@ -922,6 +926,7 @@
     // Column identifiers must match data-col on <th> and col-* class on <td>.
     // Status and Name are intentionally excluded — hiding them breaks the UI.
     _columns:[
+      ["friendlyname","Friendly Name"],
       ["ip","IP Address"],
       ["platform","Platform"],
       ["btproxy","BT Proxy"],
