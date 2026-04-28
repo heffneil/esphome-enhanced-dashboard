@@ -605,6 +605,32 @@
       $panelOverlay=document.getElementById("panelOverlay"),$sidePanel=document.getElementById("sidePanel");
 
   function esc(s){if(!s)return"";var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+  // Compare two ESPHome version strings. Returns -1 if a<b, 0 if equal, 1 if a>b.
+  // Handles formats: "2026.4.3", "2024.12.0b3", "2026.5.0-dev", etc.
+  function vcmp(a,b){
+    if(!a||!b)return 0;
+    function parse(v){
+      v=String(v).replace(/-dev$/,".dev");
+      var beta=v.match(/^([\d.]+)b(\d+)$/);
+      if(beta){return parse(beta[1]).concat([-1,parseInt(beta[2],10)])}
+      var dev=v.match(/^([\d.]+)\.dev$/);
+      if(dev){return parse(dev[1]).concat([-2,0])}
+      return v.split(".").map(function(p){var n=parseInt(p,10);return isNaN(n)?0:n});
+    }
+    var pa=parse(a),pb=parse(b),n=Math.max(pa.length,pb.length);
+    for(var i=0;i<n;i++){
+      var x=pa[i]||0,y=pb[i]||0;
+      if(x<y)return -1;
+      if(x>y)return 1;
+    }
+    return 0;
+  }
+  // True only if running version is OLDER than current (i.e. an upgrade is available).
+  // A device on a newer-than-dashboard version is not "behind" — don't nag.
+  function isUpdateAvailable(d){
+    if(!d||!d.deployed_version||!d.current_version)return false;
+    return vcmp(d.deployed_version,d.current_version)<0;
+  }
   function stOf(d){if(d.inactive)return"inactive";var s=ping[d.configuration];return s===true?"online":s===false?"offline":"unknown"}
   function stLbl(d){if(d.inactive)return"Inactive";var s=ping[d.configuration];return s===true?"Online":s===false?"Offline":"Unknown"}
   function stOrd(d){if(d.inactive)return 3;var s=ping[d.configuration];return s===true?0:(s===null||s===undefined)?1:2}
@@ -667,7 +693,7 @@
     var st=isArch?"offline":stOf(d);
     var sl=isArch?"Archived":stLbl(d);
     var cls=isArch?' class="archived-row"':d.inactive?' class="inactive-row"':'';
-    var hasUpd=!isArch&&d.deployed_version&&d.current_version&&d.deployed_version!==d.current_version;
+    var hasUpd=!isArch&&isUpdateAvailable(d);
     var tags=d.tags||[];
     var c=esc(d.configuration);
 
@@ -820,7 +846,7 @@
       if(!d)return;
       var st=isArchived?"offline":stOf(d),sl=isArchived?"Archived":stLbl(d);
       var cu=encodeURIComponent(d.configuration);
-      var hasUpd=d.deployed_version&&d.current_version&&d.deployed_version!==d.current_version;
+      var hasUpd=isUpdateAvailable(d);
       var tags=d.tags||[];
 
       document.getElementById("spDot").className="sp-dot "+st;
