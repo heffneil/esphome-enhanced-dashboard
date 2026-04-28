@@ -578,7 +578,23 @@
   })();
 
   var devices=[],archived=[],ping={},selected={};
-  var search="",activeTags=[],archOpen=false,sCol="name",sDir="asc",editingConfig=null,panelConfig=null;
+  // Restore last-used sort from localStorage so the user's preference survives reloads.
+  var _savedSort=(function(){
+    try{
+      var raw=localStorage.getItem("eed.sort");
+      if(!raw)return null;
+      var p=JSON.parse(raw);
+      if(p&&typeof p.col==="string"&&(p.dir==="asc"||p.dir==="desc"))return p;
+    }catch(e){}
+    return null;
+  })();
+  var search="",activeTags=[],archOpen=false,
+      sCol=(_savedSort&&_savedSort.col)||"name",
+      sDir=(_savedSort&&_savedSort.dir)||"asc",
+      editingConfig=null,panelConfig=null;
+  function _saveSort(){
+    try{localStorage.setItem("eed.sort",JSON.stringify({col:sCol,dir:sDir}))}catch(e){}
+  }
 
   var $search=document.getElementById("searchInput"),$clear=document.getElementById("searchClear"),
       $tb=document.getElementById("tb"),$stats=document.getElementById("statsBar"),
@@ -755,6 +771,7 @@
     var th=e.target.closest("th[data-sort]");if(!th)return;
     var c=th.getAttribute("data-sort");
     if(sCol===c)sDir=sDir==="asc"?"desc":"asc";else{sCol=c;sDir="asc"}
+    _saveSort();
     render();
   });
 
