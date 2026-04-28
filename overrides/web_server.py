@@ -1188,6 +1188,105 @@ class PingHostHandler(BaseHandler):
             self.write(json.dumps({"error": f"ping failed: {exc}"}))
 
 
+class ApiKeyHandler(BaseHandler):
+    """Return the API encryption key for a device by reading its YAML.
+
+    The StorageJSON returned by /info doesn't include the key — it lives
+    only in the YAML under api.encryption.key (or, for legacy configs,
+    api.password). We use ESPHome's yaml_util to handle !secret, !include,
+    and ${substitution} references.
+    """
+
+    @authenticated
+    @bind_config
+    async def get(self, configuration: str | None = None) -> None:
+        from pathlib import Path
+
+        self.set_header("content-type", "application/json")
+        try:
+            config_path = Path(settings.rel_path(configuration))
+            if not config_path.exists():
+                self.write(json.dumps({"error": "Configuration file not found"}))
+                return
+
+            loop = asyncio.get_running_loop()
+            data = await loop.run_in_executor(None, self._load_and_merge, config_path)
+            if not isinstance(data, dict):
+                self.write(json.dumps({"error": "Could not parse YAML"}))
+                return
+
+            api = data.get("api")
+            if not isinstance(api, dict):
+                self.write(json.dumps({"error": "No api: block in this config"}))
+                return
+
+            key = None
+            key_type = None
+
+            encryption = api.get("encryption")
+            if isinstance(encryption, dict) and encryption.get("key"):
+                key = encryption["key"]
+                key_type = "encryption"
+            elif api.get("password"):
+                key = api["password"]
+                key_type = "password"
+
+            if not key:
+                self.write(json.dumps({
+                    "error": "No encryption key configured (add api.encryption.key)",
+                }))
+                return
+
+            # Resolve a !secret reference if the YAML loader returned one as a string
+            if isinstance(key, str) and key.lstrip().startswith("!secret "):
+                secret_name = key.split(None, 1)[1].strip()
+                secret_value = await loop.run_in_executor(
+                    None, self._load_secret, secret_name
+                )
+                if secret_value is not None:
+                    key = secret_value
+                else:
+                    self.write(json.dumps({
+                        "error": f"Could not resolve !secret {secret_name}",
+                    }))
+                    return
+
+            self.write(json.dumps({"key": str(key), "type": key_type}))
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.exception("Failed to read API key for %s", configuration)
+            self.write(json.dumps({"error": f"Failed to read key: {exc}"}))
+
+    @staticmethod
+    def _load_and_merge(config_path):
+        """Load YAML with packages merged. Mirrors models._info_from_yaml."""
+        try:
+            from .models import _try_load_with_esphome, _merge_packages
+            data = _try_load_with_esphome(config_path)
+            if data is None:
+                return None
+            return _merge_packages(data)
+        except Exception:  # pylint: disable=broad-except
+            return None
+
+    @staticmethod
+    def _load_secret(secret_name):
+        """Resolve a single secret value from secrets.yaml in the config dir."""
+        try:
+            from pathlib import Path
+            secrets_path = Path(settings.absolute_config_dir) / "secrets.yaml"
+            if not secrets_path.exists():
+                return None
+            from esphome import yaml_util
+            secrets = yaml_util.load_yaml(secrets_path)
+            if isinstance(secrets, dict):
+                value = secrets.get(secret_name)
+                if value is not None:
+                    return str(value)
+        except Exception:  # pylint: disable=broad-except
+            return None
+        return None
+
+
 class DownloadListRequestHandler(BaseHandler):
     @authenticated
     @bind_config
@@ -1849,6 +1948,7 @@ def make_app(debug=get_bool_env(ENV_DEV)) -> tornado.web.Application:
             (f"{rel}version", EsphomeVersionHandler),
             (f"{rel}ignore-device", IgnoreDeviceRequestHandler),
             (f"{rel}device-tags", DeviceTagsHandler),
+            (f"{rel}api-key", ApiKeyHandler),
             (f"{rel}toggle-inactive", ToggleInactiveHandler),
             (f"{rel}ping-host", PingHostHandler),
         ],

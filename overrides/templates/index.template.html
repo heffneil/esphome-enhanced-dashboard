@@ -1557,17 +1557,28 @@
       D.closeCmdModal();
       D._openModal("API Key");
       var $body=document.getElementById("cmdModalBody");
-      $body.innerHTML='<div style="padding:20px;color:#888">Loading...</div>';
+      $body.innerHTML='<div style="padding:20px;color:#888;font-family:Inter,sans-serif">Loading...</div>';
       var $footer=document.getElementById("cmdModalFooter");
       $footer.innerHTML='<button onclick="D.closeCmdModal()">CLOSE</button>';
 
-      fetch(REL+"info?configuration="+cfgEncoded,{credentials:"same-origin"})
+      fetch(REL+"api-key?configuration="+cfgEncoded,{credentials:"same-origin"})
         .then(function(r){return r.json()})
         .then(function(data){
-          var key=data.api_key||data.noise_psk||"No API key found";
-          $body.innerHTML='<div style="padding:24px"><div style="color:#888;font-size:12px;margin-bottom:8px;font-family:Inter,sans-serif">API Key</div><div style="user-select:all;padding:12px;background:#1a1a1a;border-radius:6px;border:1px solid #333;font-size:14px;color:#e0e0e0">'+esc(key)+'</div></div>';
+          if(data.error){
+            $body.innerHTML='<div style="padding:24px;font-family:Inter,sans-serif">'+
+              '<div style="color:#ff9800;font-size:13px;margin-bottom:12px">'+esc(data.error)+'</div>'+
+              '<div style="color:#888;font-size:12px;line-height:1.55">If your config uses <code>!secret api_encryption_key</code>, make sure that key exists in <code>secrets.yaml</code>. If you don\'t have an <code>api:</code> block yet, add one with <code>encryption:</code> and a generated key.</div>'+
+              '</div>';
+            return;
+          }
+          var label=data.type==="password"?"API Password (legacy)":"Encryption Key";
+          $body.innerHTML='<div style="padding:24px;font-family:Inter,sans-serif">'+
+            '<div style="color:#888;font-size:12px;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">'+esc(label)+'</div>'+
+            '<div style="user-select:all;padding:12px;background:#0a0a0a;border-radius:6px;border:1px solid #18BCF2;font-family:\'SF Mono\',Menlo,monospace;font-size:14px;color:#e0e0e0;word-break:break-all">'+esc(data.key)+'</div>'+
+            '<div style="margin-top:10px;color:#666;font-size:11px">Click the box to select; <kbd>Cmd/Ctrl+C</kbd> to copy.</div>'+
+            '</div>';
         })
-        .catch(function(){$body.innerHTML='<div style="padding:20px;color:#ff6666">Failed to load device info</div>'});
+        .catch(function(err){$body.innerHTML='<div style="padding:20px;color:#ff6666;font-family:Inter,sans-serif">Request failed: '+esc(String(err))+'</div>'});
     },
 
     // Tag editing
