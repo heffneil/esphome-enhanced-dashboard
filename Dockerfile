@@ -1,4 +1,4 @@
-ARG BASE_VERSION=2026.4.1
+ARG BASE_VERSION=2026.4.3
 FROM esphome/esphome:${BASE_VERSION}
 
 # Copy enhanced dashboard overlay files
