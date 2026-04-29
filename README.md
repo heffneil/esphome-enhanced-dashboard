@@ -241,6 +241,23 @@ Pin to a specific ESPHome version:
 docker build --build-arg BASE_VERSION=2026.4.3 -t my-esphome-dashboard .
 ```
 
+### Option 5: Proxmox VE LXC (one-line installer)
+
+Run on a Proxmox VE host. Creates a Debian 12 unprivileged LXC, installs Docker, and brings up the enhanced dashboard with a persistent config directory and a named PlatformIO cache.
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/heffneil/esphome-enhanced-dashboard/main/script/install-proxmox.sh)"
+```
+
+The script prompts for container ID, hostname, disk/RAM/cores, network bridge, IP (or DHCP), and storage pool — defaults are sensible. Set any value as an env var to skip the prompt:
+
+```bash
+CT_HOSTNAME=esphome CT_RAM_MB=4096 IMAGE_TAG=latest \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/heffneil/esphome-enhanced-dashboard/main/script/install-proxmox.sh)"
+```
+
+When it finishes you get the dashboard URL printed to the console. Configs live at `/opt/esphome-enhanced/config` inside the LXC.
+
 ### Image tags
 
 - **`:latest`** — stable, only updated after testing
