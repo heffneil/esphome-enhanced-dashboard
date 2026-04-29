@@ -1510,6 +1510,23 @@
         editor.setTheme("ace/theme/tomorrow_night");
         editor.session.setMode("ace/mode/yaml");
         editor.setOptions({fontSize:"13px",showPrintMargin:false,tabSize:2,useSoftTabs:true,wrap:true});
+        // Filter out false-positive warnings for ESPHome's custom YAML tags
+        // (!secret, !include, !lambda) — they're valid in ESPHome configs but
+        // Ace's stock YAML linter doesn't know about them. Keep all other
+        // warnings (bad indentation, real syntax errors, etc.).
+        var _filtering=false;
+        editor.session.on("changeAnnotation",function(){
+          if(_filtering)return;
+          var anns=editor.session.getAnnotations();
+          var kept=anns.filter(function(a){
+            return !/Unknown tag\s*!\s*</i.test(a.text||"");
+          });
+          if(kept.length!==anns.length){
+            _filtering=true;
+            editor.session.setAnnotations(kept);
+            _filtering=false;
+          }
+        });
         D._aceEditor=editor;
         editor.on("change",function(){
           D._editorDirty=true;
