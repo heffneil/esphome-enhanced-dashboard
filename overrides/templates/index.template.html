@@ -1510,17 +1510,15 @@
         editor.setTheme("ace/theme/tomorrow_night");
         editor.session.setMode("ace/mode/yaml");
         editor.setOptions({fontSize:"13px",showPrintMargin:false,tabSize:2,useSoftTabs:true,wrap:true});
-        // Filter out false-positive warnings for ESPHome's custom YAML tags
-        // (!secret, !include, !lambda) — they're valid in ESPHome configs but
-        // Ace's stock YAML linter doesn't know about them. Keep all other
-        // warnings (bad indentation, real syntax errors, etc.).
+        // Filter out false-positive warnings only for KNOWN ESPHome custom
+        // tags. Genuine typos (e.g. !srcret) and other unknown tags still
+        // get flagged. Matches Ace's annotation format: "Unknown tag !<!name>".
+        var _ESPHOME_TAGS=/Unknown tag\s*!?\s*<!\s*(secret|include|include_dir_list|include_dir_named|include_dir_merge_list|include_dir_merge_named|lambda|env|extend|remove)\s*>/i;
         var _filtering=false;
         editor.session.on("changeAnnotation",function(){
           if(_filtering)return;
           var anns=editor.session.getAnnotations();
-          var kept=anns.filter(function(a){
-            return !/Unknown tag\s*!\s*</i.test(a.text||"");
-          });
+          var kept=anns.filter(function(a){return !_ESPHOME_TAGS.test(a.text||"")});
           if(kept.length!==anns.length){
             _filtering=true;
             editor.session.setAnnotations(kept);
