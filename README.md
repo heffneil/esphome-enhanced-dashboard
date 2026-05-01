@@ -365,6 +365,60 @@ proxy_set_header Connection "upgrade";
 
 ---
 
+## Changelog
+
+Versions below are HA add-on releases — the same overlay code ships in the Docker image (`heffneil/esphome-enhanced-dashboard:latest`).
+
+### 0.2.15 — 2026-05-01
+- Pin the topbar, tag bar, and selection bar to the top of the page. Only the device list scrolls — search, **+ New Device**, **Secrets**, column toggle, and bulk-action buttons stay visible no matter how long the list is.
+
+### 0.2.14 — 2026-04-29
+- Tighten the Ace warning filter to allowlist only known ESPHome tags (`!secret`, `!include*`, `!lambda`, `!env`, `!extend`, `!remove`). Typos are still flagged.
+
+### 0.2.13 — 2026-04-29
+- Suppress Ace editor false-positive `Unknown tag !<!secret>` warnings (and `!include`, `!lambda`). Real YAML errors still flagged. Closes [#8](https://github.com/heffneil/esphome-enhanced-dashboard/issues/8).
+
+### 0.2.12 — 2026-04-28
+- "(Update Available)" indicator only shows when the deployed version is older than the dashboard's. No more nagging on devices running newer betas.
+
+### 0.2.11 — 2026-04-28
+- Sort selection persists across reloads, browser restarts, and ingress sessions (per-browser `localStorage`).
+
+### 0.2.10 — 2026-04-28
+- Rebuild on ESPHome 2026.4.3.
+
+### 0.2.9 — 2026-04-24
+- Fix **Show API Key** always reporting "No API key found". Reads encryption key (or legacy password) directly from device YAML, resolves `!secret` against `secrets.yaml`.
+
+### 0.2.8 — 2026-04-23
+- Merges [#6](https://github.com/heffneil/esphome-enhanced-dashboard-addon/pull/6) from @lilmansplace: populate Platform / Name / Friendly Name / Comment from YAML when StorageJSON is missing or stale; new sortable **Friendly Name** column.
+
+### 0.2.7 — 2026-04-23
+- **Secrets** button in the topbar opens `secrets.yaml` directly in the embedded Ace editor.
+
+### 0.2.6 — 2026-04-23
+- Expose `default_compile_process_limit` add-on option.
+
+### 0.2.5 — 2026-04-23
+- Column show/hide menu covers every column (Status and Name remain always-visible).
+
+### 0.2.4 — 2026-04-23
+- Fix Classic dashboard link 404 under HA ingress.
+
+### 0.2.3 — 2026-04-22
+- Fix fetch / WebSocket URLs when running behind Home Assistant ingress.
+
+### 0.2.2 — 2026-04-19
+- Rebuild on ESPHome 2026.4.1.
+
+### 0.2.1 — 2026-04-19
+- Add **BT Proxy** column (✓ for devices with `bluetooth_proxy` configured) with hide/show toggle.
+
+### 0.2.0 — 2026-04-18
+- Initial public release. Dark dashboard with sortable table, live search, tags, archive, side panel, batch actions, install-to-IP, embedded Ace editor, in-page modals, new-device wizard. Classic dashboard preserved at `/classic`.
+
+---
+
 ## Contributing
 
 This repo tracks the upstream PR at [esphome/esphome#15704](https://github.com/esphome/esphome/pull/15704). If you have ideas or bug reports, open an issue here or comment on the PR.
