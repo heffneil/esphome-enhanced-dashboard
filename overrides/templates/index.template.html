@@ -473,14 +473,15 @@
 
 <div class="tagbar" id="tagbar"></div>
 
+<div class="batch-bar" id="batchBar" style="display:none;">
+  <span class="batch-count" id="batchCount">0 selected</span>
+  <button class="batch-btn batch-btn-primary" onclick="D.batchUpdate()">Update Selected</button>
+  <button class="batch-btn" onclick="D.batchCompile()">Compile Selected</button>
+  <button class="batch-btn batch-btn-danger" onclick="D.batchArchive()">Archive Selected</button>
+  <button class="batch-btn" onclick="D.batchClearSelection()">Clear</button>
+</div>
+
 <div class="table-wrap">
-  <div class="batch-bar" id="batchBar" style="display:none;">
-    <span class="batch-count" id="batchCount">0 selected</span>
-    <button class="batch-btn batch-btn-primary" onclick="D.batchUpdate()">Update Selected</button>
-    <button class="batch-btn" onclick="D.batchCompile()">Compile Selected</button>
-    <button class="batch-btn batch-btn-danger" onclick="D.batchArchive()">Archive Selected</button>
-    <button class="batch-btn" onclick="D.batchClearSelection()">Clear</button>
-  </div>
   <table>
     <thead id="thead">
       <tr>
