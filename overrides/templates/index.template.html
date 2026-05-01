@@ -9,12 +9,16 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
     body {
       font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       background: #111;
       color: #e0e0e0;
       font-size: 13px;
       line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     /* Topbar */
@@ -25,8 +29,7 @@
       display: flex;
       align-items: center;
       gap: 16px;
-      position: sticky;
-      top: 0;
+      flex: 0 0 auto;
       z-index: 100;
     }
     .topbar-logo { display: flex; align-items: center; text-decoration: none; flex-shrink: 0; }
@@ -151,7 +154,7 @@
     }
 
     /* Tag bar */
-    .tagbar { background: #0e0e0e; border-bottom: 1px solid #222; padding: 6px 20px; display: none; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .tagbar { background: #0e0e0e; border-bottom: 1px solid #222; padding: 6px 20px; display: none; flex-wrap: wrap; gap: 6px; align-items: center; flex: 0 0 auto; }
     .tagbar.visible { display: flex; }
     .tagbar-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
     .tag-btn { padding: 3px 10px; border: 1px solid #333; border-radius: 12px; background: transparent; color: #aaa; font-size: 11px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
@@ -163,6 +166,7 @@
     .batch-bar {
       background: #1a2a3a; border-bottom: 1px solid #2a3a4a; padding: 8px 20px;
       display: flex; align-items: center; gap: 10px;
+      flex: 0 0 auto;
     }
     .batch-count { color: #6ea8fe; font-size: 12px; font-weight: 600; margin-right: 8px; font-family: "Inter", sans-serif; }
     .batch-btn {
@@ -181,7 +185,7 @@
     .row-check { cursor: pointer; }
 
     /* Table */
-    .table-wrap { padding: 0; overflow-x: auto; }
+    .table-wrap { padding: 0; overflow: auto; flex: 1 1 auto; min-height: 0; }
     table { width: 100%; border-collapse: collapse; }
     thead { position: sticky; top: 0; z-index: 50; }
     th {
