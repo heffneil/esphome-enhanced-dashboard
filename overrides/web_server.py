@@ -1313,6 +1313,11 @@ class DownloadListRequestHandler(BaseHandler):
         if storage_json is None:
             return None
 
+        # No firmware has been compiled yet - bail out immediately before any
+        # expensive YAML parsing or module imports so the 404 is returned fast.
+        if storage_json.firmware_bin_path is None:
+            return None
+
         try:
             config = yaml_util.load_yaml(settings.rel_path(configuration))
 
@@ -1344,11 +1349,68 @@ class DownloadListRequestHandler(BaseHandler):
             get_download_types = getattr(module, "get_download_types")
         except AttributeError as exc:
             raise ValueError(f"Unknown platform {platform}") from exc
-        downloads = get_download_types(storage_json)
+        downloads = [
+            item
+            for item in get_download_types(storage_json)
+            if DownloadBinaryRequestHandler.resolve_download_path(
+                configuration, storage_json, item.get("file", "")
+            )
+            is not None  # returns (Path, bool) tuple on success, None on failure
+        ]
         return json.dumps(downloads)
 
 
 class DownloadBinaryRequestHandler(BaseHandler):
+    @staticmethod
+    def resolve_download_path(
+        configuration: str | None,
+        storage_json: StorageJSON,
+        file_name: str,
+    ) -> tuple[Path, bool] | None:
+        """Resolve a requested download artifact to a real file path.
+
+        Returns a ``(path, via_idedata)`` tuple on success, or ``None`` when the
+        artifact cannot be found.  ``via_idedata`` is ``True`` when the path was
+        located through PlatformIO idedata (i.e. an extra flash image that lives
+        outside the normal build output directory); the caller should then use
+        ``file_name`` as the download filename rather than the caller-supplied
+        ``?download=`` parameter, matching the original ESPHome behaviour.
+        """
+        if not file_name or storage_json.firmware_bin_path is None:
+            return None
+
+        base_dir = storage_json.firmware_bin_path.parent.resolve()
+        path = base_dir.joinpath(file_name).resolve()
+        try:
+            path.relative_to(base_dir)
+        except ValueError:
+            return None
+
+        if path.is_file():
+            return path, False
+
+        # The file is not in the standard build output directory - fall back to
+        # querying PlatformIO idedata for extra flash images (e.g. bootloader
+        # partitions stored elsewhere in the SDK tree).
+        # subprocess.run is used here intentionally: this method is always
+        # called inside a run_in_executor() worker thread, so blocking is safe
+        # and we cannot use the async async_run_system_command helper from
+        # within a synchronous context.
+        args = [*ESPHOME_COMMAND, "idedata", settings.rel_path(configuration)]
+        result = subprocess.run(args, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            return None
+
+        try:
+            idedata = platformio_api.IDEData(json.loads(result.stdout))
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return None
+
+        for image in idedata.extra_flash_images:
+            if image.path.as_posix().endswith(file_name):
+                return image.path, True
+        return None
+
     def _load_file(self, path: str, compressed: bool) -> bytes:
         """Load a file from disk and compress it if requested."""
         with open(path, "rb") as f:
@@ -1386,35 +1448,24 @@ class DownloadBinaryRequestHandler(BaseHandler):
             self.send_error(404)
             return
 
-        base_dir = storage_json.firmware_bin_path.parent.resolve()
-        path = base_dir.joinpath(file_name).resolve()
-        try:
-            path.relative_to(base_dir)
-        except ValueError:
-            self.send_error(403)
+        resolved = await loop.run_in_executor(
+            None,
+            self.resolve_download_path,
+            configuration,
+            storage_json,
+            file_name,
+        )
+        if resolved is None:
+            self.send_error(404)
             return
 
-        if not path.is_file():
-            args = [*ESPHOME_COMMAND, "idedata", settings.rel_path(configuration)]
-            rc, stdout, _ = await async_run_system_command(args)
-
-            if rc != 0:
-                self.send_error(404 if rc == 2 else 500)
-                return
-
-            idedata = platformio_api.IDEData(json.loads(stdout))
-
-            found = False
-            for image in idedata.extra_flash_images:
-                if image.path.as_posix().endswith(file_name):
-                    path = image.path
-                    download_name = file_name
-                    found = True
-                    break
-
-            if not found:
-                self.send_error(404)
-                return
+        path, via_idedata = resolved
+        # When the path was found via idedata (an extra flash image outside the
+        # standard build output directory) the caller-supplied ?download= name
+        # is not meaningful - use the short file_name instead, matching the
+        # original ESPHome dashboard behaviour.
+        if via_idedata:
+            download_name = file_name
 
         download_name = download_name + ".gz" if compressed else download_name
 
