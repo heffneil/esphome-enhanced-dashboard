@@ -369,6 +369,9 @@ proxy_set_header Connection "upgrade";
 
 Versions below are HA add-on releases — the same overlay code ships in the Docker image (`heffneil/esphome-enhanced-dashboard:latest`).
 
+### 0.2.16 — 2026-05-16
+- New **Download Firmware...** button on the device side panel (one-click `.bin` download, multi-artifact picker for ESP32 builds). Merges [#8](https://github.com/heffneil/esphome-enhanced-dashboard-addon/pull/8) from @dafal, closes [#7](https://github.com/heffneil/esphome-enhanced-dashboard-addon/issues/7) from @guy0nabuffalo.
+
 ### 0.2.15 — 2026-05-01
 - Pin the topbar, tag bar, and selection bar to the top of the page. Only the device list scrolls — search, **+ New Device**, **Secrets**, column toggle, and bulk-action buttons stay visible no matter how long the list is.
 
