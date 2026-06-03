@@ -369,6 +369,9 @@ proxy_set_header Connection "upgrade";
 
 Versions below are HA add-on releases — the same overlay code ships in the Docker image (`heffneil/esphome-enhanced-dashboard:latest`).
 
+### 0.2.19 — 2026-06-03
+- Fix `ImportError: cannot import name 'platformio_api'` against ESPHome 2026.5.x base. Overlay now imports the relocated `esphome.platformio.toolchain` with fallback to the old name. 0.2.18 crash-looped against 2026.5.2 — this fixes it.
+
 ### 0.2.18 — 2026-06-03
 - Rebuild on **ESPHome 2026.5.2** (was 2026.4.3). Picks up the 2026.5.0 minor release plus 2 patches — notable fixes include WiFi connection in safe mode, `!secret` quoting in bundles, API VoiceAssistant crash loop, `esphome.area` persistence in StorageJSON, ESP8266 timer/UART responsiveness, ESP-IDF hardening.
 
