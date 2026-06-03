@@ -40,7 +40,14 @@ import voluptuous as vol
 import yaml
 from yaml.nodes import Node
 
-from esphome import const, platformio_api, yaml_util
+from esphome import const, yaml_util
+
+# `platformio_api` was relocated to `esphome.platformio.toolchain` in
+# 2026.5.0. Support both layouts so this overlay works against either base.
+try:
+    from esphome import platformio_api  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover - 2026.5.x and later
+    from esphome.platformio import toolchain as platformio_api  # type: ignore
 from esphome.helpers import get_bool_env, mkdir_p, sort_ip_addresses
 from esphome.storage_json import (
     StorageJSON,
