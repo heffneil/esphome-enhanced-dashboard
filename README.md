@@ -4,7 +4,7 @@ A modern, dark-themed replacement for the stock ESPHome dashboard. Built as an o
 
 The original ESPHome dashboard is preserved and available at `/classic`.
 
-**Current base:** ESPHome 2026.4.3
+**Current base:** ESPHome 2026.5.2
 **Docker image:** [`heffneil/esphome-enhanced-dashboard`](https://hub.docker.com/r/heffneil/esphome-enhanced-dashboard)
 **Upstream PR:** [esphome/esphome#15704](https://github.com/esphome/esphome/pull/15704)
 
@@ -238,7 +238,7 @@ docker build -t my-esphome-dashboard .
 Pin to a specific ESPHome version:
 
 ```bash
-docker build --build-arg BASE_VERSION=2026.4.3 -t my-esphome-dashboard .
+docker build --build-arg BASE_VERSION=2026.5.2 -t my-esphome-dashboard .
 ```
 
 ### Option 5: Proxmox VE LXC (one-line installer)
@@ -262,7 +262,7 @@ When it finishes you get the dashboard URL printed to the console. Configs live 
 
 - **`:latest`** — stable, only updated after testing
 - **`:dev`** — development build, may contain unreleased features
-- **`:2026.4.3`** — pinned to a specific ESPHome base version
+- **`:2026.5.2`** — pinned to a specific ESPHome base version
 - **`:v0.1.0`, `:v0.2.0`** — pinned release versions
 
 ---
@@ -368,6 +368,9 @@ proxy_set_header Connection "upgrade";
 ## Changelog
 
 Versions below are HA add-on releases — the same overlay code ships in the Docker image (`heffneil/esphome-enhanced-dashboard:latest`).
+
+### 0.2.18 — 2026-06-03
+- Rebuild on **ESPHome 2026.5.2** (was 2026.4.3). Picks up the 2026.5.0 minor release plus 2 patches — notable fixes include WiFi connection in safe mode, `!secret` quoting in bundles, API VoiceAssistant crash loop, `esphome.area` persistence in StorageJSON, ESP8266 timer/UART responsiveness, ESP-IDF hardening.
 
 ### 0.2.17 — 2026-06-03
 - Friendly Name / Name columns now populate on first load for devices whose `esphome.name` lives in `!include`d packages (local or remote GitHub `url:` packages). Root substitutions correctly override package defaults. Merges [#9](https://github.com/heffneil/esphome-enhanced-dashboard-addon/pull/9) from @dafal.
