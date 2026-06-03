@@ -369,6 +369,9 @@ proxy_set_header Connection "upgrade";
 
 Versions below are HA add-on releases — the same overlay code ships in the Docker image (`heffneil/esphome-enhanced-dashboard:latest`).
 
+### 0.2.17 — 2026-06-03
+- Friendly Name / Name columns now populate on first load for devices whose `esphome.name` lives in `!include`d packages (local or remote GitHub `url:` packages). Root substitutions correctly override package defaults. Merges [#9](https://github.com/heffneil/esphome-enhanced-dashboard-addon/pull/9) from @dafal.
+
 ### 0.2.16 — 2026-05-16
 - New **Download Firmware...** button on the device side panel (one-click `.bin` download, multi-artifact picker for ESP32 builds). Merges [#8](https://github.com/heffneil/esphome-enhanced-dashboard-addon/pull/8) from @dafal, closes [#7](https://github.com/heffneil/esphome-enhanced-dashboard-addon/issues/7) from @guy0nabuffalo.
 

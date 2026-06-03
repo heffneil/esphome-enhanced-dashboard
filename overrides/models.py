@@ -6,6 +6,8 @@ import logging
 import re
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
+from urllib.parse import urlparse
+from urllib.request import urlopen
 
 if TYPE_CHECKING:
     from esphome.zeroconf import DiscoveredImport
@@ -21,6 +23,7 @@ _KNOWN_PLATFORMS = frozenset({
 
 _SUBST_REF_RE = re.compile(r'\$\{(\w+)\}|\$(\w+)')
 _ESPHOME_FIELDS = frozenset({"name", "friendly_name", "comment"})
+_REMOTE_PACKAGE_CACHE: dict[tuple[str, str, str], dict | None] = {}
 
 
 def _resolve_substitutions(value, substitutions: dict) -> str:
@@ -58,6 +61,12 @@ def _parse_manually(config_path: Path) -> dict:
         lines = config_path.read_text(encoding="utf-8").splitlines()
     except Exception:  # pylint: disable=broad-except
         return {}
+
+    return _parse_metadata_lines(lines)
+
+
+def _parse_metadata_lines(lines: list[str]) -> dict:
+    """Parse only metadata sections needed for dashboard list display."""
 
     data: dict = {}
     current_section: str | None = None
@@ -122,12 +131,111 @@ def _merge_packages(data: dict) -> dict:
 
     merged: dict = {}
     for pkg_data in packages.values():
-        if isinstance(pkg_data, dict):
+        pkg_data = _load_package_data(pkg_data)
+        if pkg_data is not None:
             _deep_merge(merged, pkg_data)
 
     root_without_packages = {k: v for k, v in data.items() if k != "packages"}
     _deep_merge(merged, root_without_packages)
     return merged
+
+
+def _load_package_data(pkg_data) -> dict | None:
+    """Return package data, resolving ESPHome IncludeFile objects if needed."""
+    if _is_remote_package_definition(pkg_data):
+        return _load_remote_package_data(pkg_data)
+
+    if isinstance(pkg_data, dict):
+        return pkg_data
+
+    load = getattr(pkg_data, "load", None)
+    if not callable(load):
+        return None
+
+    try:
+        loaded = load()
+    except Exception as exc:  # pylint: disable=broad-except
+        _LOGGER.debug("Failed to load package %r: %r", pkg_data, exc)
+        return None
+    if isinstance(loaded, dict):
+        return loaded
+    return None
+
+
+def _is_remote_package_definition(pkg_data) -> bool:
+    return isinstance(pkg_data, dict) and "url" in pkg_data and (
+        "files" in pkg_data or "file" in pkg_data
+    )
+
+
+def _load_remote_package_data(pkg_data: dict) -> dict | None:
+    """Load dashboard metadata from remote GitHub package files."""
+    url = str(pkg_data.get("url") or "")
+    ref = str(pkg_data.get("ref") or "main")
+    files = pkg_data.get("files") or pkg_data.get("file")
+    if isinstance(files, (str, dict)):
+        files = [files]
+    if not isinstance(files, list):
+        return None
+
+    base_path = str(pkg_data.get("path") or "").strip("/")
+    merged: dict = {}
+    for file_entry in files:
+        file_path = _remote_package_file_path(file_entry)
+        if not file_path:
+            continue
+        if base_path:
+            file_path = f"{base_path}/{file_path.lstrip('/')}"
+        package_data = _load_remote_yaml_metadata(url, ref, file_path)
+        if package_data is not None:
+            _deep_merge(merged, package_data)
+    return merged or None
+
+
+def _remote_package_file_path(file_entry) -> str | None:
+    if isinstance(file_entry, str):
+        return file_entry
+    if isinstance(file_entry, dict):
+        path = file_entry.get("path") or file_entry.get("file")
+        if path:
+            return str(path)
+    return None
+
+
+def _load_remote_yaml_metadata(url: str, ref: str, file_path: str) -> dict | None:
+    cache_key = (url, ref, file_path)
+    if cache_key in _REMOTE_PACKAGE_CACHE:
+        return _REMOTE_PACKAGE_CACHE[cache_key]
+
+    raw_url = _github_raw_url(url, ref, file_path)
+    if raw_url is None:
+        _REMOTE_PACKAGE_CACHE[cache_key] = None
+        return None
+
+    try:
+        with urlopen(raw_url, timeout=10) as response:  # nosec B310 - user config URL
+            text = response.read().decode("utf-8", errors="replace")
+    except Exception as exc:  # pylint: disable=broad-except
+        _LOGGER.debug("Failed to load remote package %s: %r", raw_url, exc)
+        _REMOTE_PACKAGE_CACHE[cache_key] = None
+        return None
+
+    data = _parse_metadata_lines(text.splitlines())
+    _REMOTE_PACKAGE_CACHE[cache_key] = data or None
+    return _REMOTE_PACKAGE_CACHE[cache_key]
+
+
+def _github_raw_url(url: str, ref: str, file_path: str) -> str | None:
+    parsed = urlparse(url)
+    if parsed.netloc.lower() != "github.com":
+        return None
+    parts = [part for part in parsed.path.strip("/").split("/") if part]
+    if len(parts) < 2:
+        return None
+    owner, repo = parts[:2]
+    if repo.endswith(".git"):
+        repo = repo[:-4]
+    return f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{file_path.lstrip('/')}"
 
 
 def _deep_merge(target: dict, source: dict) -> None:
