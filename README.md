@@ -369,6 +369,9 @@ proxy_set_header Connection "upgrade";
 
 Versions below are HA add-on releases — the same overlay code ships in the Docker image (`heffneil/esphome-enhanced-dashboard:latest`).
 
+### 0.2.20 — 2026-06-09
+- **Fix HA add-on stuck on ESPHome 2026.4.3 base** despite the 0.2.18 bump. The GitHub Actions workflow hardcoded `BUILD_FROM=…:2026.4.3` as a build-arg, silently overriding the Dockerfile. HA add-on users on 0.2.17–0.2.19 saw the new version label but their ESPHome was still 2026.4.3 inside. This release rebuilds against 2026.5.2 for real. Docker Hub users (who built locally) were unaffected. Closes [#12](https://github.com/heffneil/esphome-enhanced-dashboard/issues/12).
+
 ### 0.2.19 — 2026-06-03
 - Fix `ImportError: cannot import name 'platformio_api'` against ESPHome 2026.5.x base. Overlay now imports the relocated `esphome.platformio.toolchain` with fallback to the old name. 0.2.18 crash-looped against 2026.5.2 — this fixes it.
 
